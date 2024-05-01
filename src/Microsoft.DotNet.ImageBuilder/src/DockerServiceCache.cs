@@ -19,16 +19,14 @@ namespace Microsoft.DotNet.ImageBuilder
     {
         private readonly IDockerService _inner;
         private readonly ConcurrentDictionary<string, DateTime> _createdDateCache = new();
-        private readonly ImageDigestCache _imageDigestCache;
         private readonly ConcurrentDictionary<string, long> _imageSizeCache = new();
         private readonly ConcurrentDictionary<string, bool> _localImageExistsCache = new();
         private readonly ConcurrentDictionary<string, bool> _pulledImages = new();
         private readonly ConcurrentDictionary<string, (Architecture, string?)> _architectureCache = new();
 
-        public DockerServiceCache(IDockerService innerDockerService, IManifestService innerManifestService)
+        public DockerServiceCache(IDockerService innerDockerService)
         {
             _inner = innerDockerService;
-            _imageDigestCache = new ImageDigestCache(innerManifestService);
         }
 
         public Architecture Architecture => _inner.Architecture;
@@ -49,12 +47,6 @@ namespace Microsoft.DotNet.ImageBuilder
 
         public DateTime GetCreatedDate(string image, bool isDryRun) =>
             _createdDateCache.GetOrAdd(image, _ => _inner.GetCreatedDate(image, isDryRun));
-
-        public Task<string?> GetImageDigestAsync(string image, bool isDryRun) =>
-            _imageDigestCache.GetImageDigestAsync(image, isDryRun);
-
-        public void AddImageDigestToCache(string tag, string digest) =>
-            _imageDigestCache.AddDigest(tag, digest);
 
         public long GetImageSize(string image, bool isDryRun) =>
             _imageSizeCache.GetOrAdd(image, _ => _inner.GetImageSize(image, isDryRun));

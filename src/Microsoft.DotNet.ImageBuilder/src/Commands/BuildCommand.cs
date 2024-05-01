@@ -12,6 +12,7 @@ using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Microsoft.DotNet.ImageBuilder.Models.Image;
+using Microsoft.DotNet.ImageBuilder.Models.Manifest;
 using Microsoft.DotNet.ImageBuilder.ViewModel;
 
 #nullable enable
@@ -20,7 +21,8 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
     [Export(typeof(ICommand))]
     public class BuildCommand : DockerRegistryCommand<BuildOptions, BuildOptionsBuilder>
     {
-        private readonly DockerServiceCache _dockerService;
+        private readonly IDockerService _dockerService;
+        private readonly ImageDigestCache _imageDigestCache;
         private readonly IManifestService _manifestService;
         private readonly ILoggerService _loggerService;
         private readonly IGitService _gitService;
@@ -50,7 +52,8 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
             ICopyImageService copyImageService)
         {
             _manifestService = manifestServiceFactory.Create(Options.ToRegistryAuthContext());
-            _dockerService = new DockerServiceCache(_dockerService ?? throw new ArgumentNullException(nameof(gitService)), _manifestService);
+            _imageDigestCache = new ImageDigestCache(_manifestService);
+            _dockerService = new DockerServiceCache(_dockerService ?? throw new ArgumentNullException(nameof(gitService)));
             _loggerService = loggerService ?? throw new ArgumentNullException(nameof(loggerService));
             _gitService = gitService ?? throw new ArgumentNullException(nameof(gitService));
             _processService = processService ?? throw new ArgumentNullException(nameof(processService));
@@ -227,7 +230,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
         private async Task SetPlatformDataDigestAsync(PlatformData platform, string tag)
         {
             // The digest of an image that is pushed to ACR is guaranteed to be the same when transferred to MCR.
-            string? digest = await _dockerService.GetImageDigestAsync(tag, Options.IsDryRun);
+            string? digest = await _imageDigestCache.GetImageDigestAsync(tag, Options.IsDryRun);
             if (digest is not null && platform.PlatformInfo is not null)
             {
                 digest = DockerHelper.GetDigestString(platform.PlatformInfo.FullRepoModelName, DockerHelper.GetDigestSha(digest));
@@ -306,7 +309,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
                             if (platformData is not null && platform.FinalStageFromImage is not null)
                             {
                                 platformData.BaseImageDigest =
-                                   await _dockerService.GetImageDigestAsync(
+                                   await _imageDigestCache.GetImageDigestAsync(
                                        GetFromImageLocalTag(platform.FinalStageFromImage), Options.IsDryRun);
                             }
                         }
@@ -566,7 +569,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
                 // Populate the digest cache with the known digest value for the tags assigned to the image.
                 // This is needed in order to prevent a call to the manifest tool to get the digest for these tags
                 // because they haven't yet been pushed to staging by that time.
-                _dockerService.AddImageDigestToCache(tag.FullyQualifiedName, newDigest);
+                _imageDigestCache.AddDigest(tag.FullyQualifiedName, newDigest);
             }
         }
 
@@ -628,7 +631,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
                 return true;
             }
 
-            string? currentBaseImageDigest = await _dockerService.GetImageDigestAsync(
+            string? currentBaseImageDigest = await _imageDigestCache.GetImageDigestAsync(
                 GetFromImageLocalTag(platform.FinalStageFromImage), Options.IsDryRun);
 
             string? baseSha = srcPlatformData.BaseImageDigest is not null ? DockerHelper.GetDigestSha(srcPlatformData.BaseImageDigest) : null;
@@ -794,7 +797,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
                         // the DockerServiceCache for later use.  The longer we wait to get the digest after pulling, the
                         // greater chance the tag could be updated resulting in a different digest returned than what was
                         // originally pulled.
-                        await _dockerService.GetImageDigestAsync(fromImage, Options.IsDryRun);
+                        await _manifestService.GetImageDigestAsync(fromImage, Options.IsDryRun);
                     });
 
                     // Tag the images that were pulled from the mirror as they are referenced in the Dockerfiles
