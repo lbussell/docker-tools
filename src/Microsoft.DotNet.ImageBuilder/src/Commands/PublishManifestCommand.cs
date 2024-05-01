@@ -27,12 +27,12 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
         [ImportingConstructor]
         public PublishManifestCommand(
             IManifestServiceFactory manifestServiceFactory,
-            IDockerServiceFactory dockerServiceFactory,
+            IDockerService dockerService,
             ILoggerService loggerService,
             IDateTimeService dateTimeService)
         {
             _manifestService = manifestServiceFactory.Create(Options.ToRegistryAuthContext());
-            _dockerService = dockerServiceFactory.Create(_manifestService);
+            _dockerService = dockerService ??  throw new ArgumentNullException(nameof(dockerService));
             _loggerService = loggerService ?? throw new ArgumentNullException(nameof(loggerService));
             _dateTimeService = dateTimeService ?? throw new ArgumentNullException(nameof(dateTimeService));
         }

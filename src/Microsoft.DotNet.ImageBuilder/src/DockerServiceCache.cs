@@ -20,17 +20,15 @@ namespace Microsoft.DotNet.ImageBuilder
         private readonly IDockerService _inner;
         private readonly ConcurrentDictionary<string, DateTime> _createdDateCache = new();
         private readonly ImageDigestCache _imageDigestCache;
-        private readonly Dictionary<string, IEnumerable<string>> _imageLayersCache = new();
-        private readonly SemaphoreSlim _imageLayersCacheLock = new(1);
         private readonly ConcurrentDictionary<string, long> _imageSizeCache = new();
         private readonly ConcurrentDictionary<string, bool> _localImageExistsCache = new();
         private readonly ConcurrentDictionary<string, bool> _pulledImages = new();
         private readonly ConcurrentDictionary<string, (Architecture, string?)> _architectureCache = new();
 
-        public DockerServiceCache(IDockerService inner)
+        public DockerServiceCache(IDockerService innerDockerService, IManifestService innerManifestService)
         {
-            _inner = inner;
-            _imageDigestCache = new ImageDigestCache(inner);
+            _inner = innerDockerService;
+            _imageDigestCache = new ImageDigestCache(innerManifestService);
         }
 
         public Architecture Architecture => _inner.Architecture;
@@ -57,10 +55,6 @@ namespace Microsoft.DotNet.ImageBuilder
 
         public void AddImageDigestToCache(string tag, string digest) =>
             _imageDigestCache.AddDigest(tag, digest);
-
-        public Task<IEnumerable<string>> GetImageManifestLayersAsync(string image, bool isDryRun) =>
-            LockHelper.DoubleCheckedLockLookupAsync(_imageLayersCacheLock, _imageLayersCache, image,
-                () => _inner.GetImageManifestLayersAsync(image, isDryRun));
 
         public long GetImageSize(string image, bool isDryRun) =>
             _imageSizeCache.GetOrAdd(image, _ => _inner.GetImageSize(image, isDryRun));

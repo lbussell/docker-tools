@@ -62,6 +62,36 @@ namespace Microsoft.DotNet.ImageBuilder
             ManifestQueryResult manifestResult = await GetManifestAsync(tag, isDryRun);
             return manifestResult.ContentDigest;
         }
+
+        public async Task<string?> GetImageDigestAsync(string image, bool isDryRun)
+        {
+            IEnumerable<string> digests = DockerHelper.GetImageDigests(image, isDryRun);
+
+            // A digest will not exist for images that have been built locally or have been manually installed
+            if (!digests.Any())
+            {
+                return null;
+            }
+
+            string digestSha = await GetManifestDigestShaAsync(image, isDryRun);
+
+            if (digestSha is null)
+            {
+                return null;
+            }
+
+            string digest = DockerHelper.GetDigestString(DockerHelper.GetRepo(image), digestSha);
+
+            if (!digests.Contains(digest))
+            {
+                throw new InvalidOperationException(
+                    $"Found published digest '{digestSha}' for tag '{image}' but could not find a matching digest value from " +
+                    $"the set of locally pulled digests for this tag: { string.Join(", ", digests) }. This most likely means that " +
+                    "this tag has been updated since it was last pulled.");
+            }
+
+            return digest;
+        }
     }
 }
 #nullable disable

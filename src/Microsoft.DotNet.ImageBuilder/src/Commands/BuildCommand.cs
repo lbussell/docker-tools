@@ -21,6 +21,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
     public class BuildCommand : DockerRegistryCommand<BuildOptions, BuildOptionsBuilder>
     {
         private readonly DockerServiceCache _dockerService;
+        private readonly IManifestService _manifestService;
         private readonly ILoggerService _loggerService;
         private readonly IGitService _gitService;
         private readonly IProcessService _processService;
@@ -42,14 +43,14 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
         [ImportingConstructor]
         public BuildCommand(
             IManifestServiceFactory manifestServiceFactory,
-            IDockerServiceFactory dockerServiceFactory,
+            IDockerService dockerService,
             ILoggerService loggerService,
             IGitService gitService,
             IProcessService processService,
             ICopyImageService copyImageService)
         {
-            IManifestService manifestService = manifestServiceFactory.Create(Options.ToRegistryAuthContext());
-            _dockerService = dockerServiceFactory.CreateCached(manifestService);
+            _manifestService = manifestServiceFactory.Create(Options.ToRegistryAuthContext());
+            _dockerService = new DockerServiceCache(_dockerService ?? throw new ArgumentNullException(nameof(gitService)), _manifestService);
             _loggerService = loggerService ?? throw new ArgumentNullException(nameof(loggerService));
             _gitService = gitService ?? throw new ArgumentNullException(nameof(gitService));
             _processService = processService ?? throw new ArgumentNullException(nameof(processService));
@@ -219,7 +220,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
         {
             if (platform.Layers == null || !platform.Layers.Any())
             {
-                platform.Layers = (await _dockerService.GetImageManifestLayersAsync(tag, Options.IsDryRun)).ToList();
+                platform.Layers = (await _manifestService.GetImageLayersAsync(tag, Options.IsDryRun)).ToList();
             }
         }
 

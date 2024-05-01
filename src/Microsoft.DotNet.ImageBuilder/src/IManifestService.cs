@@ -5,12 +5,13 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace Microsoft.DotNet.ImageBuilder
+#nullable enable
+namespace Microsoft.DotNet.ImageBuilder;
+
+public interface IManifestService
 {
-    public interface IManifestService
-    {
-        Task<ManifestQueryResult> GetManifestAsync(string image, bool isDryRun);
-        Task<IEnumerable<string>> GetImageLayersAsync(string tag, bool isDryRun);
-        Task<string> GetManifestDigestShaAsync(string tag, bool isDryRun);
-    }
+    Task<ManifestQueryResult> GetManifestAsync(string image, bool isDryRun);
+    Task<IEnumerable<string>> GetImageLayersAsync(string tag, bool isDryRun);
+    Task<string> GetManifestDigestShaAsync(string tag, bool isDryRun);
+    Task<string?> GetImageDigestAsync(string image, bool isDryRun);
 }
