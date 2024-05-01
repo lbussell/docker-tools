@@ -2,6 +2,9 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json.Nodes;
 using System.Threading.Tasks;
 
@@ -30,6 +33,34 @@ namespace Microsoft.DotNet.ImageBuilder
 
             IRegistryContentClient registryClient = _registryClientFactory.Create(imageName.Registry!, imageName.Repo, _registryAuthContext);
             return registryClient.GetManifestAsync((imageName.Tag ?? imageName.Digest)!);
+        }
+
+        public async Task<IEnumerable<string>> GetImageLayersAsync(string tag, bool isDryRun)
+        {
+            ManifestQueryResult manifestResult = await GetManifestAsync(tag, isDryRun);
+
+            if (isDryRun)
+            {
+                return Enumerable.Empty<string>();
+            }
+
+            if (!manifestResult.Manifest.ContainsKey("layers"))
+            {
+                JsonArray manifests = (JsonArray)(manifestResult.Manifest["manifests"] ??
+                    throw new InvalidOperationException("Expected manifests property"));
+                throw new InvalidOperationException(
+                    $"'{tag}' is expected to be a concrete tag with 1 manifest. It has '{manifests.Count}' manifests.");
+            }
+
+            return ((JsonArray)manifestResult.Manifest["layers"]!)
+                .Select(layer => (layer!["digest"] ?? throw new InvalidOperationException("Expected digest property")).ToString())
+                .Reverse();
+        }
+
+        public async Task<string> GetManifestDigestShaAsync(string tag, bool isDryRun)
+        {
+            ManifestQueryResult manifestResult = await GetManifestAsync(tag, isDryRun);
+            return manifestResult.ContentDigest;
         }
     }
 }
