@@ -28,12 +28,12 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
 
         [ImportingConstructor]
         public GetStaleImagesCommand(
-            IManifestService manifestToolService,
+            IManifestServiceFactory manifestServiceFactory,
             ILoggerService loggerService,
             IOctokitClientFactory octokitClientFactory,
             IGitService gitService)
         {
-            _manifestToolService = manifestToolService;
+            _manifestToolService = manifestServiceFactory.Create(Options.ToRegistryAuthContext());
             _loggerService = loggerService;
             _octokitClientFactory = octokitClientFactory;
             _gitService = gitService;
@@ -147,7 +147,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
                     string currentDigest = await LockHelper.DoubleCheckedLockLookupAsync(_imageDigestsLock, _imageDigests, fromImage,
                         async () =>
                         {
-                            string digest = await _manifestToolService.GetManifestDigestShaAsync(fromImage, Options.ToRegistryAuthContext(), Options.IsDryRun);
+                            string digest = await _manifestToolService.GetManifestDigestShaAsync(fromImage, Options.IsDryRun);
                             return DockerHelper.GetDigestString(DockerHelper.GetRepo(fromImage), digest);
                         });
 

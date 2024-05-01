@@ -14,9 +14,9 @@ namespace Microsoft.DotNet.ImageBuilder
     public static class ManifestServiceExtensions
     {
         public static async Task<IEnumerable<string>> GetImageLayersAsync(
-            this IManifestService manifestService, string tag, RegistryAuthContext registryAuthContext, bool isDryRun)
+            this IManifestService manifestService, string tag, bool isDryRun)
         {
-            ManifestQueryResult manifestResult = await manifestService.GetManifestAsync(tag, registryAuthContext, isDryRun);
+            ManifestQueryResult manifestResult = await manifestService.GetManifestAsync(tag, isDryRun);
 
             if (isDryRun)
             {
@@ -37,9 +37,9 @@ namespace Microsoft.DotNet.ImageBuilder
         }
 
         public static async Task<string> GetManifestDigestShaAsync(
-            this IManifestService manifestService, string tag, RegistryAuthContext registryAuthContext, bool isDryRun)
+            this IManifestService manifestService, string tag, bool isDryRun)
         {
-            ManifestQueryResult manifestResult = await manifestService.GetManifestAsync(tag, registryAuthContext, isDryRun);
+            ManifestQueryResult manifestResult = await manifestService.GetManifestAsync(tag, isDryRun);
             return manifestResult.ContentDigest;
         }
     }

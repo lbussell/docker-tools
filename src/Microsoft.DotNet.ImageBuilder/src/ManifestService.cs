@@ -2,25 +2,24 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
-using System.ComponentModel.Composition;
 using System.Text.Json.Nodes;
 using System.Threading.Tasks;
 
 #nullable enable
 namespace Microsoft.DotNet.ImageBuilder
 {
-    [Export(typeof(IManifestService))]
     public class ManifestService : IManifestService
     {
         private readonly IRegistryContentClientFactory _registryClientFactory;
+        private readonly RegistryAuthContext _registryAuthContext;
 
-        [ImportingConstructor]
-        public ManifestService(IRegistryContentClientFactory registryClientFactory)
+        public ManifestService(IRegistryContentClientFactory registryClientFactory, RegistryAuthContext registryAuthContext)
         {
             _registryClientFactory = registryClientFactory;
+            _registryAuthContext = registryAuthContext;
         }
 
-        public Task<ManifestQueryResult> GetManifestAsync(string image, RegistryAuthContext registryAuthContext, bool isDryRun)
+        public Task<ManifestQueryResult> GetManifestAsync(string image, bool isDryRun)
         {
             if (isDryRun)
             {
@@ -29,7 +28,7 @@ namespace Microsoft.DotNet.ImageBuilder
 
             ImageName imageName = ImageName.Parse(image, autoResolveImpliedNames: true);
 
-            IRegistryContentClient registryClient = _registryClientFactory.Create(imageName.Registry!, imageName.Repo, registryAuthContext);
+            IRegistryContentClient registryClient = _registryClientFactory.Create(imageName.Registry!, imageName.Repo, _registryAuthContext);
             return registryClient.GetManifestAsync((imageName.Tag ?? imageName.Digest)!);
         }
     }

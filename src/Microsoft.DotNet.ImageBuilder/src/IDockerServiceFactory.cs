@@ -2,12 +2,10 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
-using System.Threading.Tasks;
+namespace Microsoft.DotNet.ImageBuilder;
 
-namespace Microsoft.DotNet.ImageBuilder
+public interface IDockerServiceFactory
 {
-    public interface IManifestService
-    {
-        Task<ManifestQueryResult> GetManifestAsync(string image, bool isDryRun);
-    }
+    IDockerService Create(IManifestService manifestService);
+    DockerServiceCache CreateCached(IManifestService manifestService);
 }

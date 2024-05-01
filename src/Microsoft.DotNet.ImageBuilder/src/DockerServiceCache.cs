@@ -15,7 +15,7 @@ namespace Microsoft.DotNet.ImageBuilder
     /// <summary>
     /// Caches state returned from Docker commands.
     /// </summary>
-    internal class DockerServiceCache : IDockerService
+    public class DockerServiceCache : IDockerService
     {
         private readonly IDockerService _inner;
         private readonly ConcurrentDictionary<string, DateTime> _createdDateCache = new();
@@ -52,19 +52,22 @@ namespace Microsoft.DotNet.ImageBuilder
         public DateTime GetCreatedDate(string image, bool isDryRun) =>
             _createdDateCache.GetOrAdd(image, _ => _inner.GetCreatedDate(image, isDryRun));
 
-        public Task<string?> GetImageDigestAsync(string image, RegistryAuthContext registryAuthContext, bool isDryRun) =>
-            _imageDigestCache.GetImageDigestAsync(image, registryAuthContext, isDryRun);
+        public Task<string?> GetImageDigestAsync(string image, bool isDryRun) =>
+            _imageDigestCache.GetImageDigestAsync(image, isDryRun);
 
-        public Task<IEnumerable<string>> GetImageManifestLayersAsync(string image, RegistryAuthContext registryAuthContext, bool isDryRun) =>
+        public void AddImageDigestToCache(string tag, string digest) =>
+            _imageDigestCache.AddDigest(tag, digest);
+
+        public Task<IEnumerable<string>> GetImageManifestLayersAsync(string image, bool isDryRun) =>
             LockHelper.DoubleCheckedLockLookupAsync(_imageLayersCacheLock, _imageLayersCache, image,
-                () => _inner.GetImageManifestLayersAsync(image, registryAuthContext, isDryRun));
+                () => _inner.GetImageManifestLayersAsync(image, isDryRun));
 
         public long GetImageSize(string image, bool isDryRun) =>
             _imageSizeCache.GetOrAdd(image, _ => _inner.GetImageSize(image, isDryRun));
-        
+
         public bool LocalImageExists(string tag, bool isDryRun) =>
             _localImageExistsCache.GetOrAdd(tag, _ => _inner.LocalImageExists(tag, isDryRun));
-        
+
         public void PullImage(string image, string? platform, bool isDryRun)
         {
             _pulledImages.GetOrAdd(image, _ =>

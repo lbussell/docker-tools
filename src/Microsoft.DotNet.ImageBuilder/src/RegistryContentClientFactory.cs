@@ -27,7 +27,7 @@ public class RegistryContentClientFactory(IHttpClientProvider httpClientProvider
         {
             ownedAcr = $"{ownedAcr}{DockerHelper.AcrDomain}";
         }
-        
+
         if (apiRegistry == ownedAcr)
         {
             // If the target registry is the owned ACR, connect to it with the Azure library API. This handles all the Azure auth.

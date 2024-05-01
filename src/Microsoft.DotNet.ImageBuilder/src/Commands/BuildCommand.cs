@@ -20,12 +20,11 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
     [Export(typeof(ICommand))]
     public class BuildCommand : DockerRegistryCommand<BuildOptions, BuildOptionsBuilder>
     {
-        private readonly IDockerService _dockerService;
+        private readonly DockerServiceCache _dockerService;
         private readonly ILoggerService _loggerService;
         private readonly IGitService _gitService;
         private readonly IProcessService _processService;
         private readonly ICopyImageService _copyImageService;
-        private readonly ImageDigestCache _imageDigestCache;
         private readonly List<TagInfo> _processedTags = new List<TagInfo>();
         private readonly HashSet<PlatformData> _builtPlatforms = new();
 
@@ -41,11 +40,16 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
         private ImageArtifactDetails? _imageArtifactDetails;
 
         [ImportingConstructor]
-        public BuildCommand(IDockerService dockerService, ILoggerService loggerService, IGitService gitService,
-            IProcessService processService, ICopyImageService copyImageService)
+        public BuildCommand(
+            IManifestServiceFactory manifestServiceFactory,
+            IDockerServiceFactory dockerServiceFactory,
+            ILoggerService loggerService,
+            IGitService gitService,
+            IProcessService processService,
+            ICopyImageService copyImageService)
         {
-            _imageDigestCache = new ImageDigestCache(dockerService);
-            _dockerService = new DockerServiceCache(dockerService ?? throw new ArgumentNullException(nameof(dockerService)));
+            IManifestService manifestService = manifestServiceFactory.Create(Options.ToRegistryAuthContext());
+            _dockerService = dockerServiceFactory.CreateCached(manifestService);
             _loggerService = loggerService ?? throw new ArgumentNullException(nameof(loggerService));
             _gitService = gitService ?? throw new ArgumentNullException(nameof(gitService));
             _processService = processService ?? throw new ArgumentNullException(nameof(processService));
@@ -215,14 +219,14 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
         {
             if (platform.Layers == null || !platform.Layers.Any())
             {
-                platform.Layers = (await _dockerService.GetImageManifestLayersAsync(tag, Options.ToRegistryAuthContext(), Options.IsDryRun)).ToList();
+                platform.Layers = (await _dockerService.GetImageManifestLayersAsync(tag, Options.IsDryRun)).ToList();
             }
         }
 
         private async Task SetPlatformDataDigestAsync(PlatformData platform, string tag)
         {
             // The digest of an image that is pushed to ACR is guaranteed to be the same when transferred to MCR.
-            string? digest = await _imageDigestCache.GetImageDigestAsync(tag, Options.ToRegistryAuthContext(), Options.IsDryRun);
+            string? digest = await _dockerService.GetImageDigestAsync(tag, Options.IsDryRun);
             if (digest is not null && platform.PlatformInfo is not null)
             {
                 digest = DockerHelper.GetDigestString(platform.PlatformInfo.FullRepoModelName, DockerHelper.GetDigestSha(digest));
@@ -301,8 +305,8 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
                             if (platformData is not null && platform.FinalStageFromImage is not null)
                             {
                                 platformData.BaseImageDigest =
-                                   await _imageDigestCache.GetImageDigestAsync(
-                                       GetFromImageLocalTag(platform.FinalStageFromImage), Options.ToRegistryAuthContext(), Options.IsDryRun);
+                                   await _dockerService.GetImageDigestAsync(
+                                       GetFromImageLocalTag(platform.FinalStageFromImage), Options.IsDryRun);
                             }
                         }
                     }
@@ -561,7 +565,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
                 // Populate the digest cache with the known digest value for the tags assigned to the image.
                 // This is needed in order to prevent a call to the manifest tool to get the digest for these tags
                 // because they haven't yet been pushed to staging by that time.
-                _imageDigestCache.AddDigest(tag.FullyQualifiedName, newDigest);
+                _dockerService.AddImageDigestToCache(tag.FullyQualifiedName, newDigest);
             }
         }
 
@@ -623,8 +627,8 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
                 return true;
             }
 
-            string? currentBaseImageDigest = await _imageDigestCache.GetImageDigestAsync(
-                GetFromImageLocalTag(platform.FinalStageFromImage), Options.ToRegistryAuthContext(), Options.IsDryRun);
+            string? currentBaseImageDigest = await _dockerService.GetImageDigestAsync(
+                GetFromImageLocalTag(platform.FinalStageFromImage), Options.IsDryRun);
 
             string? baseSha = srcPlatformData.BaseImageDigest is not null ? DockerHelper.GetDigestSha(srcPlatformData.BaseImageDigest) : null;
             string? currentSha = currentBaseImageDigest is not null ? DockerHelper.GetDigestSha(currentBaseImageDigest) : null;
@@ -789,7 +793,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
                         // the DockerServiceCache for later use.  The longer we wait to get the digest after pulling, the
                         // greater chance the tag could be updated resulting in a different digest returned than what was
                         // originally pulled.
-                        await _imageDigestCache.GetImageDigestAsync(fromImage, Options.ToRegistryAuthContext(), Options.IsDryRun);
+                        await _dockerService.GetImageDigestAsync(fromImage, Options.IsDryRun);
                     });
 
                     // Tag the images that were pulled from the mirror as they are referenced in the Dockerfiles

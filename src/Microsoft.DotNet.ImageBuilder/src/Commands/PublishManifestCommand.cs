@@ -18,7 +18,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
     [Export(typeof(ICommand))]
     public class PublishManifestCommand : DockerRegistryCommand<PublishManifestOptions, PublishManifestOptionsBuilder>
     {
-        private readonly IManifestService _manifestToolService;
+        private readonly IManifestService _manifestService;
         private readonly IDockerService _dockerService;
         private readonly ILoggerService _loggerService;
         private readonly IDateTimeService _dateTimeService;
@@ -26,13 +26,13 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
 
         [ImportingConstructor]
         public PublishManifestCommand(
-            IManifestService manifestToolService,
-            IDockerService dockerService,
+            IManifestServiceFactory manifestServiceFactory,
+            IDockerServiceFactory dockerServiceFactory,
             ILoggerService loggerService,
             IDateTimeService dateTimeService)
         {
-            _manifestToolService = manifestToolService ?? throw new ArgumentNullException(nameof(manifestToolService));
-            _dockerService = dockerService ?? throw new ArgumentNullException(nameof(dockerService));
+            _manifestService = manifestServiceFactory.Create(Options.ToRegistryAuthContext());
+            _dockerService = dockerServiceFactory.Create(_manifestService);
             _loggerService = loggerService ?? throw new ArgumentNullException(nameof(loggerService));
             _dateTimeService = dateTimeService ?? throw new ArgumentNullException(nameof(dateTimeService));
         }
@@ -86,8 +86,8 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
 
                 image.Manifest.Digest = DockerHelper.GetDigestString(
                     image.ManifestRepo.FullModelName,
-                    await _manifestToolService.GetManifestDigestShaAsync(
-                        sharedTag.FullyQualifiedName, Options.ToRegistryAuthContext(), Options.IsDryRun));
+                    await _manifestService.GetManifestDigestShaAsync(
+                        sharedTag.FullyQualifiedName, Options.IsDryRun));
 
                 IEnumerable<(string Repo, string Tag)> syndicatedRepresentativeSharedTags = image.ManifestImage.SharedTags
                     .Where(tag => tag.SyndicatedRepo is not null)
@@ -101,9 +101,8 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
                 {
                     string digest = DockerHelper.GetDigestString(
                         DockerHelper.GetImageName(Manifest.Model.Registry, syndicatedSharedTag.Repo),
-                        await _manifestToolService.GetManifestDigestShaAsync(
+                        await _manifestService.GetManifestDigestShaAsync(
                             DockerHelper.GetImageName(Manifest.Registry, Options.RepoPrefix + syndicatedSharedTag.Repo, syndicatedSharedTag.Tag),
-                            Options.ToRegistryAuthContext(),
                             Options.IsDryRun));
                     image.Manifest.SyndicatedDigests.Add(digest);
                 }

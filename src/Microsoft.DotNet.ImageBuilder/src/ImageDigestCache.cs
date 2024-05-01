@@ -33,11 +33,11 @@ namespace Microsoft.DotNet.ImageBuilder
             }
         }
 
-        public Task<string?> GetImageDigestAsync(string tag, RegistryAuthContext registryAuthContext, bool isDryRun) =>
+        public Task<string?> GetImageDigestAsync(string tag, bool isDryRun) =>
             LockHelper.DoubleCheckedLockLookupAsync(_digestCacheLock, _digestCache, tag,
-                () => _dockerService.GetImageDigestAsync(tag, registryAuthContext, isDryRun),
+                () => _dockerService.GetImageDigestAsync(tag, isDryRun),
                 // Don't allow null digests to be cached. A locally built image won't have a digest until
-                // it is pushed so if its digest is retrieved before pushing, we don't want that 
+                // it is pushed so if its digest is retrieved before pushing, we don't want that
                 // null to be cached.
                 val => !string.IsNullOrEmpty(val));
     }
