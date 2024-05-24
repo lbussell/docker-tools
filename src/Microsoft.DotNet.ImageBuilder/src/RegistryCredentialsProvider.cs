@@ -4,6 +4,7 @@
 using System;
 using System.ComponentModel.Composition;
 using System.Threading.Tasks;
+using Azure.Core;
 
 namespace Microsoft.DotNet.ImageBuilder;
 
@@ -14,6 +15,10 @@ public class RegistryCredentialsProvider(ILoggerService loggerService, IHttpClie
 {
     private readonly ILoggerService _loggerService = loggerService;
     private readonly IHttpClientProvider _httpClientProvider = httpClientProvider;
+
+    private TokenCredential? _tokenCredentialCache = null;
+
+    public TokenCredential Credential { get => _tokenCredentialCache ??= AuthHelper.GetDefaultCredential(); }
 
     /// <summary>
     /// Dynamically gets the RegistryCredentials for the specified registry in the following order of preference:
@@ -46,7 +51,8 @@ public class RegistryCredentialsProvider(ILoggerService loggerService, IHttpClie
 
     private async ValueTask<RegistryCredentials> GetAcrCredentialsWithOAuthAsync(ILoggerService logger, string apiRegistry)
     {
-        (string token, Guid tenantId) = await AuthHelper.GetDefaultAccessTokenAsync(logger);
+        Guid tenantId = AuthHelper.GetTenantId(logger, Credential);
+        string token = (await AuthHelper.GetTokenAsync(Credential)).Token;
         string refreshToken = await OAuthHelper.GetRefreshTokenAsync(_httpClientProvider.GetClient(), apiRegistry, tenantId, token);
         return new RegistryCredentials(Guid.Empty.ToString(), refreshToken);
     }

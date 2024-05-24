@@ -72,10 +72,10 @@ namespace Microsoft.DotNet.ImageBuilder
 
         private Task<string> GetAccessTokenAsync() =>
             _accessToken.GetValueAsync(async () =>
-                (await AuthHelper.GetDefaultAccessTokenAsync(_loggerService, McrStatusResource)).token);
+                (await AuthHelper.GetTokenAsync(AuthHelper.GetDefaultCredential(), McrStatusResource)).Token);
 
         private Task RefreshAccessTokenAsync() =>
             _accessToken.ResetValueAsync(async () =>
-                (await AuthHelper.GetDefaultAccessTokenAsync(_loggerService, McrStatusResource)).token);
+                (await AuthHelper.GetTokenAsync(AuthHelper.GetDefaultCredential(), McrStatusResource)).Token);
     }
 }

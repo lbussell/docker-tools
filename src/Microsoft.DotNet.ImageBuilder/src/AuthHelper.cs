@@ -5,6 +5,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Azure.Core;
 using Azure.Identity;
@@ -16,13 +17,14 @@ namespace Microsoft.DotNet.ImageBuilder
     {
         private const string DefaultScope = "https://management.azure.com/.default";
 
-        public static async Task<(string token, Guid tenantId)> GetDefaultAccessTokenAsync(ILoggerService loggerService, string resource = DefaultScope)
+        public static TokenCredential GetDefaultCredential()
         {
             DefaultAzureCredential credential  = new();
-            AccessToken token = await credential.GetTokenAsync(new TokenRequestContext([ resource ]));
-            Guid tenantId = GetTenantId(loggerService, credential);
-            return (token.Token, tenantId);
+            return credential;
         }
+
+        public static ValueTask<AccessToken> GetTokenAsync(TokenCredential credential, string scope = DefaultScope)
+            => credential.GetTokenAsync(new TokenRequestContext([ scope ]), CancellationToken.None);
 
         public static Guid GetTenantId(ILoggerService loggerService, TokenCredential credential)
         {
