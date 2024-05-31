@@ -37,10 +37,14 @@ namespace Microsoft.DotNet.ImageBuilder
 
         public static Uri GetAcrUri(string acrName) => new($"https://{FormatAcrName(acrName)}");
 
-        public static IEnumerable<string> GetImageDigests(string image, bool isDryRun)
+        public static IEnumerable<string> GetLocalImageDigests(string image, bool isDryRun)
         {
             string digests = ExecuteCommandWithFormat(
                 "inspect", "index .RepoDigests", "Failed to retrieve image digests", image, isDryRun);
+
+            // Example outputs:
+            // [mcr.microsoft.com/dotnet/runtime@sha256:fcd1efab7bccbbdf5b66fa89bf1301b1bf28ec763f47c1b0ea9b060667d5b452]
+            // [<repo>@sha256:<digest1> <repo>@sha256:<digest2>]
 
             string trimmedDigests = digests.TrimStart('[').TrimEnd(']');
             if (trimmedDigests == string.Empty)

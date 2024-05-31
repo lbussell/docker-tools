@@ -26,7 +26,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
         private readonly IProcessService _processService;
         private readonly ICopyImageService _copyImageService;
         private readonly Lazy<IManifestService> _manifestService;
-        private readonly ImageDigestCache _imageDigestCache;
+        private readonly Lazy<ImageDigestCache> _imageDigestCache;
         private readonly List<TagInfo> _processedTags = new List<TagInfo>();
         private readonly HashSet<PlatformData> _builtPlatforms = new();
 
@@ -49,6 +49,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
             IProcessService processService,
             ICopyImageService copyImageService,
             IManifestServiceFactory manifestServiceFactory,
+            IImageDigestServiceFactory imageDigestServiceFactory,
             IRegistryCredentialsProvider registryCredentialsProvider)
             : base(registryCredentialsProvider)
         {
@@ -62,7 +63,8 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
             ArgumentNullException.ThrowIfNull(manifestServiceFactory);
             _manifestService = new Lazy<IManifestService>(() =>
                 manifestServiceFactory.Create(ownedAcr: Options.RegistryOverride, Options.CredentialsOptions));
-            _imageDigestCache = new ImageDigestCache(_manifestService);
+            var imageDigestService = imageDigestServiceFactory.Create(_manifestService.Value);
+            _imageDigestCache = new ImageDigestCache();
         }
 
         protected override string Description => "Builds Dockerfiles";

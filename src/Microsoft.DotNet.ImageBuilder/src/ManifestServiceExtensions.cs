@@ -14,7 +14,7 @@ namespace Microsoft.DotNet.ImageBuilder
     public static class ManifestServiceExtensions
     {
         public static async Task<IEnumerable<string>> GetImageLayersAsync(
-            this IInnerManifestService manifestService, string tag, bool isDryRun)
+            this IManifestService manifestService, string tag, bool isDryRun)
         {
             if (isDryRun)
             {
@@ -35,41 +35,11 @@ namespace Microsoft.DotNet.ImageBuilder
                 .Reverse();
         }
 
-        public static async Task<string?> GetImageDigestAsync(
-            this IInnerManifestService manifestService, string image, bool isDryRun)
-        {
-            IEnumerable<string> digests = DockerHelper.GetImageDigests(image, isDryRun);
-
-            // A digest will not exist for images that have been built locally or have been manually installed
-            if (!digests.Any())
-            {
-                return null;
-            }
-
-            string digestSha = await manifestService.GetManifestDigestShaAsync(image, isDryRun);
-            if (digestSha is null)
-            {
-                return null;
-            }
-
-            string digest = DockerHelper.GetDigestString(DockerHelper.GetRepo(image), digestSha);
-            if (!digests.Contains(digest))
-            {
-                throw new InvalidOperationException(
-                    $"Found published digest '{digestSha}' for tag '{image}' but could not find a matching digest value from " +
-                    $"the set of locally pulled digests for this tag: { string.Join(", ", digests) }. This most likely means that " +
-                    "this tag has been updated since it was last pulled.");
-            }
-
-            return digest;
-        }
-
         public static async Task<string> GetManifestDigestShaAsync(
-            this IInnerManifestService manifestService, string tag, bool isDryRun)
+            this IManifestService manifestService, string tag, bool isDryRun)
         {
             ManifestQueryResult manifestResult = await manifestService.GetManifestAsync(tag, isDryRun);
             return manifestResult.ContentDigest;
         }
     }
 }
-#nullable disable
