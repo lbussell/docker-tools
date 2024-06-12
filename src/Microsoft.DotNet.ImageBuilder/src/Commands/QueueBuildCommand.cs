@@ -47,7 +47,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
         public override async Task ExecuteAsync()
         {
             string subscriptionsJson = File.ReadAllText(Options.SubscriptionsPath);
-            Subscription[] subscriptions = JsonConvert.DeserializeObject<Subscription[]>(subscriptionsJson);
+            BaseImageUpdateSubscription[] subscriptions = JsonConvert.DeserializeObject<BaseImageUpdateSubscription[]>(subscriptionsJson);
             IEnumerable<SubscriptionImagePaths> imagePathsBySubscription = GetAllSubscriptionImagePaths();
 
             if (imagePathsBySubscription.Any())
@@ -83,7 +83,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
                 .ToList();
         }
 
-        private async Task QueueBuildForStaleImages(Subscription subscription, IEnumerable<string> pathsToRebuild)
+        private async Task QueueBuildForStaleImages(BaseImageUpdateSubscription subscription, IEnumerable<string> pathsToRebuild)
         {
             if (!pathsToRebuild.Any())
             {
@@ -159,7 +159,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
         }
 
         private async Task LogAndNotifyResultsAsync(
-            Subscription subscription, IEnumerable<string> pathsToRebuild, WebApi.Build? queuedBuild, Exception? exception,
+            BaseImageUpdateSubscription subscription, IEnumerable<string> pathsToRebuild, WebApi.Build? queuedBuild, Exception? exception,
             IEnumerable<string>? inProgressBuilds, IEnumerable<string>? recentFailedBuilds)
         {
             StringBuilder notificationMarkdown = new();

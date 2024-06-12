@@ -104,8 +104,8 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
                 await context.ExecuteCommandAsync();
 
                 // Only one of the images has a changed digest
-                Dictionary<Subscription, IList<string>> expectedPathsBySubscription =
-                    new Dictionary<Subscription, IList<string>>
+                Dictionary<BaseImageUpdateSubscription, IList<string>> expectedPathsBySubscription =
+                    new Dictionary<BaseImageUpdateSubscription, IList<string>>
                 {
                     {
                         subscriptionInfos[0].Subscription,
@@ -196,8 +196,8 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
                 await context.ExecuteCommandAsync();
 
                 // The base image of the final stage has changed for only one of the images.
-                Dictionary<Subscription, IList<string>> expectedPathsBySubscription =
-                    new Dictionary<Subscription, IList<string>>
+                Dictionary<BaseImageUpdateSubscription, IList<string>> expectedPathsBySubscription =
+                    new Dictionary<BaseImageUpdateSubscription, IList<string>>
                 {
                     {
                         subscriptionInfos[0].Subscription,
@@ -261,8 +261,8 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
             {
                 await context.ExecuteCommandAsync();
 
-                Dictionary<Subscription, IList<string>> expectedPathsBySubscription =
-                    new Dictionary<Subscription, IList<string>>
+                Dictionary<BaseImageUpdateSubscription, IList<string>> expectedPathsBySubscription =
+                    new Dictionary<BaseImageUpdateSubscription, IList<string>>
                 {
                     {
                         subscriptionInfos[0].Subscription,
@@ -327,8 +327,8 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
             {
                 await context.ExecuteCommandAsync();
 
-                Dictionary<Subscription, IList<string>> expectedPathsBySubscription =
-                    new Dictionary<Subscription, IList<string>>
+                Dictionary<BaseImageUpdateSubscription, IList<string>> expectedPathsBySubscription =
+                    new Dictionary<BaseImageUpdateSubscription, IList<string>>
                 {
                 };
 
@@ -380,8 +380,8 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
                 await context.ExecuteCommandAsync();
 
                 // Since neither of the images existed in the image info data, both should be queued.
-                Dictionary<Subscription, IList<string>> expectedPathsBySubscription =
-                    new Dictionary<Subscription, IList<string>>
+                Dictionary<BaseImageUpdateSubscription, IList<string>> expectedPathsBySubscription =
+                    new Dictionary<BaseImageUpdateSubscription, IList<string>>
                 {
                     {
                         subscriptionInfos[0].Subscription,
@@ -556,8 +556,8 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
             {
                 await context.ExecuteCommandAsync();
 
-                Dictionary<Subscription, IList<string>> expectedPathsBySubscription =
-                    new Dictionary<Subscription, IList<string>>
+                Dictionary<BaseImageUpdateSubscription, IList<string>> expectedPathsBySubscription =
+                    new Dictionary<BaseImageUpdateSubscription, IList<string>>
                 {
                     {
                         subscriptionInfos[0].Subscription,
@@ -651,8 +651,8 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
                 await context.ExecuteCommandAsync();
 
                 // Both of the images has a changed digest
-                Dictionary<Subscription, IList<string>> expectedPathsBySubscription =
-                    new Dictionary<Subscription, IList<string>>
+                Dictionary<BaseImageUpdateSubscription, IList<string>> expectedPathsBySubscription =
+                    new Dictionary<BaseImageUpdateSubscription, IList<string>>
                 {
                     {
                         subscriptionInfos[0].Subscription,
@@ -735,8 +735,8 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
                 await context.ExecuteCommandAsync();
 
                 // No paths are expected
-                Dictionary<Subscription, IList<string>> expectedPathsBySubscription =
-                    new Dictionary<Subscription, IList<string>>();
+                Dictionary<BaseImageUpdateSubscription, IList<string>> expectedPathsBySubscription =
+                    new Dictionary<BaseImageUpdateSubscription, IList<string>>();
 
                 context.Verify(expectedPathsBySubscription);
             }
@@ -802,7 +802,7 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
                 await context.ExecuteCommandAsync();
 
                 // No paths are expected
-                Dictionary<Subscription, IList<string>> expectedPathsBySubscription = new();
+                Dictionary<BaseImageUpdateSubscription, IList<string>> expectedPathsBySubscription = new();
 
                 context.Verify(expectedPathsBySubscription);
             }
@@ -933,8 +933,8 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
             {
                 await context.ExecuteCommandAsync();
 
-                Dictionary<Subscription, IList<string>> expectedPathsBySubscription =
-                    new Dictionary<Subscription, IList<string>>
+                Dictionary<BaseImageUpdateSubscription, IList<string>> expectedPathsBySubscription =
+                    new Dictionary<BaseImageUpdateSubscription, IList<string>>
                 {
                     {
                         subscriptionInfos[0].Subscription,
@@ -1081,7 +1081,7 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
             {
                 await context.ExecuteCommandAsync();
 
-                Dictionary<Subscription, IList<string>> expectedPathsBySubscription =
+                Dictionary<BaseImageUpdateSubscription, IList<string>> expectedPathsBySubscription =
                     new()
                 {
                     {
@@ -1179,8 +1179,8 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
             {
                 await context.ExecuteCommandAsync();
 
-                Dictionary<Subscription, IList<string>> expectedPathsBySubscription =
-                    new Dictionary<Subscription, IList<string>>
+                Dictionary<BaseImageUpdateSubscription, IList<string>> expectedPathsBySubscription =
+                    new Dictionary<BaseImageUpdateSubscription, IList<string>>
                 {
                     {
                         subscriptionInfos[0].Subscription,
@@ -1269,8 +1269,8 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
                 await context.ExecuteCommandAsync();
 
                 // Only one of the images has a changed digest
-                Dictionary<Subscription, IList<string>> expectedPathsBySubscription =
-                    new Dictionary<Subscription, IList<string>>
+                Dictionary<BaseImageUpdateSubscription, IList<string>> expectedPathsBySubscription =
+                    new Dictionary<BaseImageUpdateSubscription, IList<string>>
                 {
                     {
                         subscriptionInfos[0].Subscription,
@@ -1345,8 +1345,8 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
             {
                 await context.ExecuteCommandAsync();
 
-                Dictionary<Subscription, IList<string>> expectedPathsBySubscription =
-                    new Dictionary<Subscription, IList<string>>
+                Dictionary<BaseImageUpdateSubscription, IList<string>> expectedPathsBySubscription =
+                    new Dictionary<BaseImageUpdateSubscription, IList<string>>
                 {
                     {
                         subscriptionInfos[0].Subscription,
@@ -1428,8 +1428,8 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
                 await context.ExecuteCommandAsync();
 
                 // No paths are expected
-                Dictionary<Subscription, IList<string>> expectedPathsBySubscription =
-                    new Dictionary<Subscription, IList<string>>();
+                Dictionary<BaseImageUpdateSubscription, IList<string>> expectedPathsBySubscription =
+                    new Dictionary<BaseImageUpdateSubscription, IList<string>>();
 
                 context.Verify(expectedPathsBySubscription);
             }
@@ -1503,8 +1503,8 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
                 await context.ExecuteCommandAsync();
 
                 // Only one of the images has a changed digest
-                Dictionary<Subscription, IList<string>> expectedPathsBySubscription =
-                    new Dictionary<Subscription, IList<string>>
+                Dictionary<BaseImageUpdateSubscription, IList<string>> expectedPathsBySubscription =
+                    new Dictionary<BaseImageUpdateSubscription, IList<string>>
                 {
                     {
                         subscriptionInfos[0].Subscription,
@@ -1596,7 +1596,7 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
 
                 // Only one of the images has a changed digest
                 // It should be comparing against the digest of the image from the override.
-                Dictionary<Subscription, IList<string>> expectedPathsBySubscription = new()
+                Dictionary<BaseImageUpdateSubscription, IList<string>> expectedPathsBySubscription = new()
                 {
                     {
                         subscriptionInfos[0].Subscription,
@@ -1622,13 +1622,13 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
             return testMethodName + suffix;
         }
 
-        private static Subscription CreateSubscription(
+        private static BaseImageUpdateSubscription CreateSubscription(
             string repoName,
             int index = 0,
             string osType = null,
             [CallerMemberName] string testMethodName = null)
         {
-            return new Subscription
+            return new BaseImageUpdateSubscription
             {
                 PipelineTrigger = new PipelineTrigger
                 {
@@ -1726,7 +1726,7 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
             /// <summary>
             /// Verifies the test execution to ensure the results match the expected state.
             /// </summary>
-            public void Verify(IDictionary<Subscription, IList<string>> expectedPathsBySubscription)
+            public void Verify(IDictionary<BaseImageUpdateSubscription, IList<string>> expectedPathsBySubscription)
             {
                 IInvocation invocation = this.loggerServiceMock.Invocations
                     .First(invocation => invocation.Method.Name == nameof(ILoggerService.WriteMessage) &&
@@ -1745,7 +1745,7 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
 
                 Assert.Equal(expectedPathsBySubscription.Count, pathsBySubscription.Length);
 
-                foreach (KeyValuePair<Subscription, IList<string>> kvp in expectedPathsBySubscription)
+                foreach (KeyValuePair<BaseImageUpdateSubscription, IList<string>> kvp in expectedPathsBySubscription)
                 {
                     string[] actualPaths = pathsBySubscription
                         .First(imagePaths => imagePaths.SubscriptionId == kvp.Key.Id).ImagePaths;
@@ -1853,7 +1853,7 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
 
                 foreach (SubscriptionInfo subscriptionInfo in subscriptionInfos)
                 {
-                    Subscription subscription = subscriptionInfo.Subscription;
+                    BaseImageUpdateSubscription subscription = subscriptionInfo.Subscription;
                     List<DockerfileInfo> repoDockerfileInfos = dockerfileInfos[subscription.Manifest];
 
                     string url = $"https://github.com/{subscription.Manifest.Owner}/{subscription.Manifest.Repo}.git";
@@ -1879,7 +1879,7 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
             /// <param name="repoDockerfileInfos">Set of <see cref="DockerfileInfo"/> objects that describe the Dockerfiles contained in the repo.</param>
             private void GenerateRepo(
                 string repoPath,
-                Subscription subscription,
+                BaseImageUpdateSubscription subscription,
                 Manifest manifest,
                 List<DockerfileInfo> repoDockerfileInfos)
             {
@@ -1939,7 +1939,7 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
             /// <param name="build">The <see cref="Build"/> to validate.</param>
             /// <param name="subscription">Subscription object that contains metadata to compare against the <paramref name="build"/>.</param>
             /// <param name="expectedPaths">The set of expected path arguments that should have been passed to the build.</param>
-            private static bool FilterBuildToSubscription(WebApi.Build build, Subscription subscription, IList<string> expectedPaths)
+            private static bool FilterBuildToSubscription(WebApi.Build build, BaseImageUpdateSubscription subscription, IList<string> expectedPaths)
             {
                 return build.Definition.Id == subscription.PipelineTrigger.Id &&
                     build.SourceBranch == subscription.Manifest.Branch &&
@@ -2012,14 +2012,14 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
 
         private class SubscriptionInfo
         {
-            public SubscriptionInfo(Models.Subscription.Subscription subscription, Manifest manifest, ImageArtifactDetails imageInfo)
+            public SubscriptionInfo(Models.Subscription.BaseImageUpdateSubscription subscription, Manifest manifest, ImageArtifactDetails imageInfo)
             {
                 Subscription = subscription;
                 Manifest = manifest;
                 ImageInfo = imageInfo;
             }
 
-            public Models.Subscription.Subscription Subscription { get; }
+            public Models.Subscription.BaseImageUpdateSubscription Subscription { get; }
             public Manifest Manifest { get; }
             public ImageArtifactDetails ImageInfo { get; }
         }

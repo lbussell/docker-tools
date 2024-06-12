@@ -33,7 +33,7 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
         {
             const string path1 = "path1";
 
-            Subscription[] subscriptions = new Subscription[]
+            BaseImageUpdateSubscription[] subscriptions = new BaseImageUpdateSubscription[]
             {
                 CreateSubscription("repo1")
             };
@@ -77,7 +77,7 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
         {
             const string path1 = "path1";
 
-            Subscription[] subscriptions = new Subscription[]
+            BaseImageUpdateSubscription[] subscriptions = new BaseImageUpdateSubscription[]
             {
                 CreateSubscription("repo1")
             };
@@ -122,7 +122,7 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
         {
             const string path1 = "path1";
 
-            Subscription[] subscriptions = new Subscription[]
+            BaseImageUpdateSubscription[] subscriptions = new BaseImageUpdateSubscription[]
             {
                 CreateSubscription("repo1")
             };
@@ -157,7 +157,7 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
             await context.ExecuteCommandAsync();
 
 
-            Dictionary<Subscription, IList<string>> expectedPathsBySubscription = new()
+            Dictionary<BaseImageUpdateSubscription, IList<string>> expectedPathsBySubscription = new()
             {
                 {
                     subscriptions[0],
@@ -179,7 +179,7 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
         {
             const string path1 = "path1";
 
-            Subscription[] subscriptions = new Subscription[]
+            BaseImageUpdateSubscription[] subscriptions = new BaseImageUpdateSubscription[]
             {
                 CreateSubscription("repo1")
             };
@@ -219,7 +219,7 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
             using TestContext context = new(subscriptions, allSubscriptionImagePaths, new PagedList<WebApi.Build>(), allBuilds);
             await context.ExecuteCommandAsync();
 
-            Dictionary<Subscription, IList<string>> expectedPathsBySubscription = new()
+            Dictionary<BaseImageUpdateSubscription, IList<string>> expectedPathsBySubscription = new()
             {
                 {
                     subscriptions[0],
@@ -244,7 +244,7 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
             const string path2 = "path2";
             const string path3 = "path3";
 
-            Subscription[] subscriptions = new Subscription[]
+            BaseImageUpdateSubscription[] subscriptions = new BaseImageUpdateSubscription[]
             {
                 CreateSubscription("repo1"),
                 CreateSubscription("repo2")
@@ -288,8 +288,8 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
             {
                 await context.ExecuteCommandAsync();
 
-                Dictionary<Subscription, IList<string>> expectedPathsBySubscription =
-                    new Dictionary<Subscription, IList<string>>
+                Dictionary<BaseImageUpdateSubscription, IList<string>> expectedPathsBySubscription =
+                    new Dictionary<BaseImageUpdateSubscription, IList<string>>
                 {
                     {
                         subscriptions[0],
@@ -318,7 +318,7 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
         [Fact]
         public async Task QueueBuildCommand_NoBaseImageChange()
         {
-            Subscription[] subscriptions = new Subscription[]
+            BaseImageUpdateSubscription[] subscriptions = new BaseImageUpdateSubscription[]
             {
                 CreateSubscription("repo1")
             };
@@ -362,7 +362,7 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
             const string path2 = "path2";
             const string path3 = "path3";
 
-            Subscription[] subscriptions = new Subscription[]
+            BaseImageUpdateSubscription[] subscriptions = new BaseImageUpdateSubscription[]
             {
                 CreateSubscription("repo1")
             };
@@ -398,8 +398,8 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
             {
                 await context.ExecuteCommandAsync();
 
-                Dictionary<Subscription, IList<string>> expectedPathsBySubscription =
-                    new Dictionary<Subscription, IList<string>>
+                Dictionary<BaseImageUpdateSubscription, IList<string>> expectedPathsBySubscription =
+                    new Dictionary<BaseImageUpdateSubscription, IList<string>>
                 {
                     {
                         subscriptions[0],
@@ -427,12 +427,12 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
             return testMethodName + suffix;
         }
 
-        private static Subscription CreateSubscription(
+        private static BaseImageUpdateSubscription CreateSubscription(
             string repoName,
             int index = 0,
             [CallerMemberName] string testMethodName = null)
         {
-            return new Subscription
+            return new BaseImageUpdateSubscription
             {
                 PipelineTrigger = new PipelineTrigger
                 {
@@ -489,7 +489,7 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
             /// <param name="subscriptions">The set of subscription metadata describing the Git repos that are listening for changes to base images.</param>
             /// <param name="allSubscriptionImagePaths">Multiple sets of mappings between subscriptions and their associated image paths.</param>
             public TestContext(
-                Subscription[] subscriptions,
+                BaseImageUpdateSubscription[] subscriptions,
                 IEnumerable<IEnumerable<SubscriptionImagePaths>> allSubscriptionImagePaths)
                 : this(subscriptions, allSubscriptionImagePaths, new PagedList<WebApi.Build>(), new PagedList<WebApi.Build>())
             {
@@ -503,7 +503,7 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
             /// <param name="inProgressBuilds">The set of in-progress builds that should be configured.</param>
             /// <param name="allBuilds">The set of failed builds that should be configured.</param>
             public TestContext(
-                Subscription[] subscriptions,
+                BaseImageUpdateSubscription[] subscriptions,
                 IEnumerable<IEnumerable<SubscriptionImagePaths>> allSubscriptionImagePaths,
                 PagedList<WebApi.Build> inProgressBuilds,
                 PagedList<WebApi.Build> allBuilds)
@@ -546,7 +546,7 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
             /// <param name="expectedPathsBySubscription">
             /// A mapping of subscription metadata to the list of expected path args passed to the queued build, if any.
             /// </param>
-            public void Verify(int notificationPostCallCount, bool isQueuedBuildExpected, IDictionary<Subscription, IList<string>> expectedPathsBySubscription = null)
+            public void Verify(int notificationPostCallCount, bool isQueuedBuildExpected, IDictionary<BaseImageUpdateSubscription, IList<string>> expectedPathsBySubscription = null)
             {
                 _notificationServiceMock
                     .Verify(o => o.PostAsync(
@@ -570,7 +570,7 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
                         throw new ArgumentNullException(nameof(expectedPathsBySubscription));
                     }
 
-                    foreach (KeyValuePair<Subscription, IList<string>> kvp in expectedPathsBySubscription)
+                    foreach (KeyValuePair<BaseImageUpdateSubscription, IList<string>> kvp in expectedPathsBySubscription)
                     {
                         if (kvp.Value.Any())
                         {
@@ -673,7 +673,7 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
             /// <param name="build">The <see cref="Build"/> to validate.</param>
             /// <param name="subscription">Subscription object that contains metadata to compare against the <paramref name="build"/>.</param>
             /// <param name="expectedPaths">The set of expected path arguments that should have been passed to the build.</param>
-            private static bool FilterBuildToSubscription(WebApi.Build build, Subscription subscription, IList<string> expectedPaths)
+            private static bool FilterBuildToSubscription(WebApi.Build build, BaseImageUpdateSubscription subscription, IList<string> expectedPaths)
             {
                 return build.Definition.Id == subscription.PipelineTrigger.Id &&
                     build.SourceBranch == subscription.Manifest.Branch &&

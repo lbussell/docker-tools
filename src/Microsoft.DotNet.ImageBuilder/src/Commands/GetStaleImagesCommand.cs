@@ -9,6 +9,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.DotNet.ImageBuilder.Models.Image;
+using Microsoft.DotNet.ImageBuilder.Models.Subscription;
 using Microsoft.DotNet.ImageBuilder.ViewModel;
 using Newtonsoft.Json;
 using Octokit;
@@ -55,7 +56,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
             }
 
             IEnumerable<Task<SubscriptionImagePaths>> getPathResults =
-                SubscriptionHelper.GetSubscriptionManifests(
+                SubscriptionHelper.GetSubscriptionManifests<BaseImageUpdateSubscription>(
                     Options.SubscriptionOptions.SubscriptionsPath, Options.FilterOptions, _gitService)
                 .Select(async subscriptionManifest =>
                     new SubscriptionImagePaths
@@ -84,7 +85,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
                 $"Image Paths to be Rebuilt:{Environment.NewLine}{formattedResults}");
         }
 
-        private async Task<IEnumerable<string>> GetPathsToRebuildAsync(Models.Subscription.Subscription subscription, ManifestInfo manifest)
+        private async Task<IEnumerable<string>> GetPathsToRebuildAsync(BaseImageUpdateSubscription subscription, ManifestInfo manifest)
         {
             ImageArtifactDetails imageArtifactDetails = await GetImageInfoForSubscriptionAsync(subscription, manifest);
 
@@ -183,7 +184,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
             return pathsToRebuild;
         }
 
-        private async Task<ImageArtifactDetails> GetImageInfoForSubscriptionAsync(Models.Subscription.Subscription subscription, ManifestInfo manifest)
+        private async Task<ImageArtifactDetails> GetImageInfoForSubscriptionAsync(BaseImageUpdateSubscription subscription, ManifestInfo manifest)
         {
             IApiConnection connection = OctokitClientFactory.CreateApiConnection(Options.GitOptions.ToOctokitCredentials());
 

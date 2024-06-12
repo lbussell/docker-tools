@@ -16,20 +16,17 @@ namespace Microsoft.DotNet.ImageBuilder
 {
     public static class SubscriptionHelper
     {
-        public static IEnumerable<(Subscription Subscription, ManifestInfo Manifest)> GetSubscriptionManifests(
+        public static IEnumerable<(T Subscription, ManifestInfo Manifest)> GetSubscriptionManifests<T>(
             string subscriptionsPath, ManifestFilterOptions filterOptions,
             IGitService gitService, Action<ManifestOptions>? configureOptions = null)
+            where T : ManifestOnlySubscription
         {
             string subscriptionsJson = File.ReadAllText(subscriptionsPath);
-            Subscription[]? subscriptions = JsonConvert.DeserializeObject<Subscription[]>(subscriptionsJson);
-            if (subscriptions is null)
-            {
-                throw new JsonException($"Unable to correctly deserialize path '{subscriptionsJson}'.");
-            }
+            T[] subscriptions = JsonConvert.DeserializeObject<T[]>(subscriptionsJson)
+                ?? throw new JsonException($"Unable to correctly deserialize path '{subscriptionsJson}'.");
 
-            List<(Subscription Subscription, ManifestInfo Manifest)> subscriptionManifests = new
-                List<(Subscription Subscription, ManifestInfo Manifest)>();
-            foreach (Subscription subscription in subscriptions)
+            List<(T Subscription, ManifestInfo Manifest)> subscriptionManifests = [];
+            foreach (T subscription in subscriptions)
             {
                 ManifestInfo? manifest = GetSubscriptionManifest(
                     subscription, filterOptions, gitService, configureOptions);
@@ -42,8 +39,9 @@ namespace Microsoft.DotNet.ImageBuilder
             return subscriptionManifests;
         }
 
-        private static ManifestInfo? GetSubscriptionManifest(Subscription subscription,
+        private static ManifestInfo? GetSubscriptionManifest<T>(T subscription,
             ManifestFilterOptions filterOptions, IGitService gitService, Action<ManifestOptions>? configureOptions)
+            where T : ManifestOnlySubscription
         {
             // If the command is filtered with an OS type that does not match the OsType filter of the subscription,
             // then there are no images that need to be inspected.

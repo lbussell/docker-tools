@@ -8,6 +8,7 @@ using System.ComponentModel.Composition;
 using System.Linq;
 using System.Threading.Tasks;
 using Azure.ResourceManager.ContainerRegistry.Models;
+using Microsoft.DotNet.ImageBuilder.Models.Subscription;
 using Microsoft.DotNet.ImageBuilder.ViewModel;
 
 #nullable enable
@@ -60,10 +61,10 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
                 }
 
                 manifests =
-                    SubscriptionHelper.GetSubscriptionManifests(
+                    SubscriptionHelper.GetSubscriptionManifests<ManifestOnlySubscription>(
                         Options.SubscriptionOptions.SubscriptionsPath, Options.FilterOptions, _gitService,
                         options => options.RegistryOverride = Options.RegistryOverride)
-                    .Select(subscriptionManifest => subscriptionManifest.Manifest);
+                    .Select(manifestSubscription => manifestSubscription.Manifest);
                 fullRegistryName = Options.RegistryOverride;
             }
 
