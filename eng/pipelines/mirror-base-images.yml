@@ -1,0 +1,35 @@
+trigger: none
+pr: none
+
+# schedules:
+# - cron: "0 0,4,8,12,16,20 * * *"
+#   displayName: Daily build
+#   branches:
+#     include:
+#     - main
+#   always: true
+
+variables:
+- template: /eng/pipelines/templates/variables/common.yml@self
+- name: mirrorRepoPrefix
+  value: ''
+- name: acrServer
+  value: '$(acr-mirror.server)'
+- name: acrServiceConnection
+  value: '$(acr-mirror.serviceConnectionName)'
+- name: acrSubscription
+  value: '$(acr-mirror.subscription)'
+- name: acrResourceGroup
+  value: '$(acr-mirror.resourceGroup)'
+
+extends:
+  template: /eng/common/templates/1es-unofficial.yml@self
+  parameters:
+    stages:
+    - stage: CheckBaseImages
+      displayName: Check Base Images
+      jobs:
+      - template: /eng/pipelines/templates/jobs/mirror-base-images.yml@self
+        parameters:
+          jobName: MirrorBaseImages
+          subscriptionsPath: eng/mirror-base-images-subscriptions.json

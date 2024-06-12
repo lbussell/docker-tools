@@ -1,0 +1,17 @@
+parameters:
+  additionalOptions: null
+  publicProjectName: null
+  internalProjectName: null
+  continueOnError: false
+
+steps:
+- ${{ if or(eq(variables['System.TeamProject'], parameters.publicProjectName), eq(variables['Build.Reason'], 'PullRequest')) }}:
+  - template: /eng/common/templates/steps/set-dry-run.yml@self
+- template: /eng/common/templates/steps/copy-base-images.yml@self
+  parameters:
+    acr:
+      server: $(acr.server)
+      serviceConnection: $(acr.serviceConnectionName)
+      subscription: $(acr.subscription)
+      resourceGroup: $(acr.resourceGroup)
+    continueOnError: ${{ parameters.continueOnError }}

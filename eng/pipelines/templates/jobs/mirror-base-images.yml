@@ -1,0 +1,27 @@
+parameters:
+- name: jobName
+  type: string
+  default: "MirrorBaseImages"
+- name: subscriptionsPath
+  type: string
+  default: null
+- name: acr
+  type: object
+  default:
+    server: ''
+    serviceConnection: ''
+    subscription: ''
+    resourceGroup: ''
+
+jobs:
+- job: ${{ parameters.jobName }}
+  pool:
+    name: NetCore1ESPool-Internal
+    image: 1es-ubuntu-2204
+    os: linux
+  steps:
+  - template: /eng/common/templates/steps/init-docker-linux.yml@self
+  - template: /eng/common/templates/steps/copy-base-images.yml@self
+    parameters:
+      additionalOptions: "--subscriptions-path '${{ parameters.subscriptionsPath }}'"
+      acr: ${{ parameters.acr }}

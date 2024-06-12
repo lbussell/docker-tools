@@ -55,6 +55,7 @@ public class CopyImageService : ICopyImageService
         ContainerRegistryImportSourceCredentials? sourceCredentials = null,
         bool isDryRun = false)
     {
+        string fullAcrName = destAcrName;
         destAcrName = GetBaseAcrName(destAcrName);
 
         ContainerRegistryImportSource importSrc = new(srcTagName)
@@ -70,7 +71,7 @@ public class CopyImageService : ICopyImageService
         importImageContent.TargetTags.AddRange(destTagNames);
 
         string formattedDestTagNames = string.Join(
-            ", ", destTagNames.Select(tag => $"'{DockerHelper.GetImageName(destAcrName, tag)}'").ToArray());
+            ", ", destTagNames.Select(tag => $"'{DockerHelper.GetImageName(fullAcrName, tag)}'").ToArray());
         _loggerService.WriteMessage(
             $"Importing {formattedDestTagNames} from '{DockerHelper.GetImageName(srcRegistryName, srcTagName)}'");
 

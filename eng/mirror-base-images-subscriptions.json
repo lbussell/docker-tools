@@ -1,0 +1,49 @@
+[
+  {
+    "manifest": {
+      "owner": "dotnet",
+      "repo": "docker-tools",
+      "branch": "main",
+      "path": "src/Microsoft.DotNet.ImageBuilder/manifest.json",
+      "variables": {
+        "UniqueId": ""
+      }
+    }
+  },
+  {
+    "manifest": {
+      "owner": "dotnet",
+      "repo": "dotnet-docker",
+      "branch": "main",
+      "path": "manifest.json"
+    }
+  },
+  {
+    "manifest": {
+      "owner": "dotnet",
+      "repo": "dotnet-docker",
+      "branch": "nightly",
+      "path": "manifest.json"
+    }
+  },
+  {
+    "manifest": {
+      "owner": "dotnet",
+      "repo": "dotnet-docker",
+      "branch": "main",
+      "path": "manifest.samples.json"
+    }
+  },
+  {
+    "manifest": {
+      "owner": "dotnet",
+      "repo": "dotnet-buildtools-prereqs-docker",
+      "branch": "main",
+      "path": "manifest.json",
+      "variables": {
+        "FloatingTagSuffix": "",
+        "UniqueId": ""
+      }
+    }
+  }
+]
