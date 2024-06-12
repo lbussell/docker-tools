@@ -1,20 +1,24 @@
 parameters:
-- name: jobName
+- name: name
   type: string
-  default: "MirrorBaseImages"
+  default: null
 - name: subscriptionsPath
+  type: string
+  default: null
+- name: repoPrefix
   type: string
   default: null
 - name: acr
   type: object
   default:
+    resourceGroup: ''
     server: ''
     serviceConnection: ''
     subscription: ''
-    resourceGroup: ''
 
 jobs:
-- job: ${{ parameters.jobName }}
+- job: MirrorBaseImages_${{ parameters.name }}
+  displayName: Mirror Base Images - ${{ parameters.name }}
   pool:
     name: NetCore1ESPool-Internal
     image: 1es-ubuntu-2204
@@ -24,5 +28,5 @@ jobs:
   - template: /eng/common/templates/steps/copy-base-images.yml@self
     parameters:
       additionalOptions: "--subscriptions-path '${{ parameters.subscriptionsPath }}'"
-      acr: ${{ parameters.acr }}
       repoPrefix: $(mirrorRepoPrefix)
+      acr: ${{ parameters.acr }}

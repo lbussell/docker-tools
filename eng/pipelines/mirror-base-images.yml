@@ -10,26 +10,24 @@ pr: none
 #   always: true
 
 variables:
-- template: /eng/pipelines/templates/variables/common.yml@self
+- template: /eng/common/templates/variables/dotnet/common.yml@self
 - name: mirrorRepoPrefix
-  value: 'test/'
-- name: acrServer
-  value: '$(acr-mirror.server)'
-- name: acrServiceConnection
-  value: '$(acr-mirror.serviceConnectionName)'
-- name: acrSubscription
-  value: '$(acr-mirror.subscription)'
-- name: acrResourceGroup
-  value: '$(acr-mirror.resourceGroup)'
+  value: ""
 
 extends:
   template: /eng/common/templates/1es-unofficial.yml@self
   parameters:
     stages:
-    - stage: CheckBaseImages
-      displayName: Check Base Images
+    - stage: MirrorBaseImages
+      displayName: Mirror Base Images
       jobs:
       - template: /eng/pipelines/templates/jobs/mirror-base-images.yml@self
         parameters:
-          jobName: MirrorBaseImages
+          name: "Public"
           subscriptionsPath: eng/mirror-base-images-subscriptions.json
+          repoPrefix: $(mirrorRepoPrefix)
+          acr:
+            resourceGroup: $(public-mirror.resourceGroup)
+            server: $(public-mirror.server)
+            serviceConnection: $(public-mirror.serviceConnectionName)
+            subscription: $(public-mirror.subscription)
