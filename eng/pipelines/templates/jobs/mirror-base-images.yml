@@ -8,6 +8,9 @@ parameters:
 - name: repoPrefix
   type: string
   default: null
+- name: dryRun
+  type: boolean
+  default: false
 - name: acr
   type: object
   default:
@@ -25,6 +28,8 @@ jobs:
     os: linux
   steps:
   - template: /eng/common/templates/steps/init-docker-linux.yml@self
+  - ${{ if eq(parameters.dryRun, true) }}:
+    - script: echo "##vso[task.setvariable variable=dryRunArg]--dry-run"
   - template: /eng/common/templates/steps/copy-base-images.yml@self
     parameters:
       additionalOptions: "--subscriptions-path '${{ parameters.subscriptionsPath }}'"

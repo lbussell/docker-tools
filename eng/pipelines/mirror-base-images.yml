@@ -9,6 +9,12 @@ pr: none
 #     - main
 #   always: true
 
+parameters:
+- name: dryRun
+  displayName: Dry Run
+  type: boolean
+  default: false
+
 variables:
 - template: /eng/common/templates/variables/dotnet/common.yml@self
 - name: mirrorRepoPrefix
@@ -26,6 +32,7 @@ extends:
           name: "Public"
           subscriptionsPath: eng/mirror-base-images-subscriptions.json
           repoPrefix: $(mirrorRepoPrefix)
+          dryRun: ${{ parameters.dryRun }}
           acr:
             resourceGroup: $(public-mirror.resourceGroup)
             server: $(public-mirror.server)
