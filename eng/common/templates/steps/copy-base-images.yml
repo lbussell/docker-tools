@@ -18,7 +18,6 @@ parameters:
 
 steps:
 # - ${{ if or(eq(variables['System.TeamProject'], parameters.publicProjectName), eq(variables['Build.Reason'], 'PullRequest')) }}:
-- template: /eng/common/templates/steps/set-dry-run.yml@self
 - template: /eng/common/templates/steps/run-imagebuilder.yml@self
   parameters:
     displayName: Copy Base Images
@@ -38,5 +37,5 @@ steps:
       --registry-override '${{ parameters.acr.server }}'
       --os-type 'linux'
       --architecture '*'
-      $env:DRYRUNARG
+      --dry-run
       ${{ parameters.additionalOptions }}
