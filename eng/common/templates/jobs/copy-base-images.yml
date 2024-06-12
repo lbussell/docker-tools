@@ -12,7 +12,7 @@ jobs:
   steps:
   - template: /eng/common/templates/steps/init-docker-linux.yml@self
   - ${{ parameters.customInitSteps }}
-  - template: /eng/common/templates/steps/copy-base-images.yml@self
+  - template: /eng/common/templates/steps/copy-base-images-ci.yml@self
     parameters:
       additionalOptions: ${{ parameters.additionalOptions }}
       publicProjectName: ${{ parameters.publicProjectName }}

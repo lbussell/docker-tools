@@ -12,7 +12,7 @@ pr: none
 variables:
 - template: /eng/pipelines/templates/variables/common.yml@self
 - name: mirrorRepoPrefix
-  value: ''
+  value: 'test/'
 - name: acrServer
   value: '$(acr-mirror.server)'
 - name: acrServiceConnection

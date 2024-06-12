@@ -25,3 +25,4 @@ jobs:
     parameters:
       additionalOptions: "--subscriptions-path '${{ parameters.subscriptionsPath }}'"
       acr: ${{ parameters.acr }}
+      repoPrefix: $(mirrorRepoPrefix)

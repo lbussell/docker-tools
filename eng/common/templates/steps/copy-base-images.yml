@@ -33,7 +33,7 @@ steps:
       '${{ parameters.acr.resourceGroup }}'
       $(dockerHubRegistryCreds)
       $(customCopyBaseImagesArgs)
-      --repo-prefix $(mirrorRepoPrefix)
+      --repo-prefix '${{ parameters.repoPrefix }}'
       --registry-override '${{ parameters.acr.server }}'
       --os-type 'linux'
       --architecture '*'
