@@ -12,12 +12,7 @@ jobs:
   - ${{ parameters.customInitSteps }}
   - ${{ if or(eq(variables['System.TeamProject'], 'public'), eq(variables['Build.Reason'], 'PullRequest')) }}:
     - template: /eng/common/templates/steps/set-dry-run.yml@self
-  - template: /eng/common/templates/steps/copy-base-images.yml@self
+  - template: /eng/common/templates/steps/copy-base-images-staging.yml@self
     parameters:
       additionalOptions: ${{ parameters.additionalOptions }}
       continueOnError: true
-      acr:
-        resourceGroup: $(acr-staging.resourceGroup)
-        server: $(acr-staging.server)
-        serviceConnection: $(acr-staging.serviceConnectionName)
-        subscription: $(acr-staging.subscription)

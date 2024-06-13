@@ -11,7 +11,7 @@ parameters:
   default: ""
 - name: repoPrefix
   type: string
-  default: ""
+  default: null
 - name: continueOnError
   type: string
   default: false

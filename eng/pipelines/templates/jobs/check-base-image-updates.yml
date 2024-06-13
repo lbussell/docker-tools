@@ -13,11 +13,9 @@ jobs:
     os: linux
   steps:
   - template: /eng/common/templates/steps/init-docker-linux.yml@self
-  - template: /eng/common/templates/steps/copy-base-images.yml@self
+  - template: /eng/common/templates/steps/copy-base-images-staging.yml@self
     parameters:
       additionalOptions: "--subscriptions-path '${{ parameters.subscriptionsPath }}'"
-      publicProjectName: ${{ parameters.publicProjectName }}
-      internalProjectName: ${{ parameters.internalProjectName }}
   - script: >
       $(runImageBuilderCmd)
       getStaleImages

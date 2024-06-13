@@ -1,13 +1,13 @@
 trigger: none
 pr: none
 
-# schedules:
-# - cron: "0 0,6,12,18 * * *"
-#   displayName: Daily build
-#   branches:
-#     include:
-#     - main
-#   always: true
+schedules:
+- cron: "0 0,6,12,18 * * *"
+  displayName: Daily build
+  branches:
+    include:
+    - main
+  always: true
 
 parameters:
 - name: dryRun
