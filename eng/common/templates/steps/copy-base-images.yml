@@ -36,5 +36,5 @@ steps:
       --registry-override '${{ parameters.acr.server }}'
       --os-type 'linux'
       --architecture '*'
-      --dry-run
+      $DRYRUNARG
       ${{ parameters.additionalOptions }}
