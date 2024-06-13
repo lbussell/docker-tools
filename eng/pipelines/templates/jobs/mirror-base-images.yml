@@ -33,5 +33,5 @@ jobs:
   - template: /eng/common/templates/steps/copy-base-images.yml@self
     parameters:
       additionalOptions: "--subscriptions-path '${{ parameters.subscriptionsPath }}'"
-      repoPrefix: $(mirrorRepoPrefix)
+      repoPrefix: ${{ parameters.repoPrefix }}
       acr: ${{ parameters.acr }}
