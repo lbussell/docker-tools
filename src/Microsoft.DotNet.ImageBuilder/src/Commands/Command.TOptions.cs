@@ -42,6 +42,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
 
             cmd.Handler = CommandHandler.Create<TOptions>(options =>
             {
+                PrintDockerVersions(options);
                 Initialize(options);
                 return ExecuteAsync();
             });
@@ -54,7 +55,18 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
             Options = options;
         }
 
+        private static void PrintDockerVersions(TOptions options)  
+        {
+            if (options.NoVersionOutput)
+            {
+                return;
+            }
+
+            // Capture the Docker version and info in the output.
+            ExecuteHelper.Execute(fileName: "docker", args: "version", isDryRun: false);
+            ExecuteHelper.Execute(fileName: "docker", args: "info", isDryRun: false);
+        }
+
         public abstract Task ExecuteAsync();
     }
 }
-#nullable disable
