@@ -8,4 +8,15 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
     {
         ManifestFilterOptions FilterOptions { get; }
     }
+
+    public interface IPlatformFilterableOptions
+    {
+
+        PlatformFilterOptions Platform { get; }
+    }
+
+    public interface IDockerfileFilterableOptions
+    {
+        DockerfileFilterOptions Dockerfile { get; }
+    }
 }

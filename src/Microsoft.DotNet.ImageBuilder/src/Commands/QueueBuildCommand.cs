@@ -92,7 +92,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
             }
 
             string formattedPathsToRebuild = pathsToRebuild
-                .Select(path => $"{CliHelper.FormatAlias(ManifestFilterOptionsBuilder.PathOptionName)} '{path}'")
+                .Select(path => $"{CliHelper.FormatAlias(DockerfileFilterOptionsBuilder.PathOptionName)} '{path}'")
                 .Aggregate((p1, p2) => $"{p1} {p2}");
 
             string parameters = "{\"" + subscription.PipelineTrigger.PathVariable + "\": \"" + formattedPathsToRebuild + "\"}";

@@ -16,6 +16,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
     {
         public bool IsDryRun { get; set; }
         public bool IsVerbose { get; set; }
+        public bool NoVersionOutput { get; set; }
 
         public string? GetOption(string name)
         {
@@ -38,15 +39,16 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
 
     public class CliOptionsBuilder
     {
-        public virtual IEnumerable<Argument> GetCliArguments() => Enumerable.Empty<Argument>();
+        public virtual IEnumerable<Argument> GetCliArguments() => [];
+
         public virtual IEnumerable<Option> GetCliOptions() =>
-            new Option[]
-            {
+            [   
                 CreateOption<bool>("dry-run", nameof(Options.IsDryRun),
                     "Dry run of what images get built and order they would get built in"),
                 CreateOption<bool>("verbose", nameof(Options.IsVerbose),
-                    "Show details about the tasks run")
-            };
+                    "Show details about the tasks run"),
+                CreateOption<bool>("no-version", nameof(Options.NoVersionOutput),
+                    "Whether to disable version output used in CI scenarios"),
+            ];
     }
 }
-#nullable disable

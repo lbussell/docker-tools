@@ -9,9 +9,9 @@ using System.Linq;
 #nullable enable
 namespace Microsoft.DotNet.ImageBuilder.Commands
 {
-    public class GenerateDockerfilesOptions : GenerateArtifactsOptions, IFilterableOptions
+    public class GenerateDockerfilesOptions : GenerateArtifactsOptions
     {
-        public ManifestFilterOptions FilterOptions { get; set; } = new ManifestFilterOptions();
+        public DockerfileFilterOptions FilterOptions { get; set; } = new DockerfileFilterOptions();
 
         public GenerateDockerfilesOptions() : base()
         {
@@ -20,16 +20,14 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
 
     public class GenerateDockerfilesOptionsBuilder : GenerateArtifactsOptionsBuilder
     {
-        private readonly ManifestFilterOptionsBuilder _manifestFilterOptionsBuilder =
-            new ManifestFilterOptionsBuilder();
+        private readonly DockerfileFilterOptionsBuilder _dockerfileFilterOptionsBuilder = new();
 
         public override IEnumerable<Option> GetCliOptions() =>
             base.GetCliOptions()
-                .Concat(_manifestFilterOptionsBuilder.GetCliOptions());
+                .Concat(_dockerfileFilterOptionsBuilder.GetCliOptions());
 
         public override IEnumerable<Argument> GetCliArguments() =>
             base.GetCliArguments()
-                .Concat(_manifestFilterOptionsBuilder.GetCliArguments());
+                .Concat(_dockerfileFilterOptionsBuilder.GetCliArguments());
     }
 }
-#nullable disable

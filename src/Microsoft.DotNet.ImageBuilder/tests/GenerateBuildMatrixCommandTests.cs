@@ -39,7 +39,7 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
                 command.Options.ProductVersionComponents = 3;
                 if (filterPaths != null)
                 {
-                    command.Options.FilterOptions.Paths = filterPaths.Replace("--path ", "").Split(" ");
+                    command.Options.FilterOptions.Dockerfile.Paths = filterPaths.Replace("--path ", "").Split(" ");
                 }
 
                 const string runtimeDepsRelativeDir = "2.1.1/runtime-deps/os";
@@ -106,7 +106,7 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
                 command.Options.MatrixType = MatrixType.PlatformDependencyGraph;
                 if (filterPaths != null)
                 {
-                    command.Options.FilterOptions.Paths = filterPaths.Replace("--path ", "").Split(" ");
+                    command.Options.FilterOptions.Dockerfile.Paths = filterPaths.Replace("--path ", "").Split(" ");
                 }
 
                 const string runtimeDepsRelativeDir = "1.0/runtimedeps/os/amd64";
