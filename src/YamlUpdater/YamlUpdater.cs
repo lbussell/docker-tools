@@ -14,7 +14,7 @@ using YamlDotNet.Core;
 using YamlDotNet.Core.Events;
 using YamlDotNet.RepresentationModel;
 
-namespace YamlUpdater
+namespace Microsoft.DotNet.Docker.Tools.YamlUpdater
 {
     public class YamlUpdater
     {

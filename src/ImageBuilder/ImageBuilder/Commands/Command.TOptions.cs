@@ -26,7 +26,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
 
         public Command GetCliCommand()
         {
-            Command cmd = new Command(this.GetCommandName(), Description);
+            Command cmd = new Command(GetCommandName(), Description);
 
             TOptionsBuilder OptionsBuilder = new TOptionsBuilder();
 
@@ -47,6 +47,12 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
             });
 
             return cmd;
+        }
+
+        private string GetCommandName()
+        {
+            string commandName = GetType().Name.TrimEnd("Command");
+            return char.ToLowerInvariant(commandName[0]) + commandName.Substring(1);
         }
 
         protected virtual void Initialize(TOptions options)

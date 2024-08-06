@@ -17,7 +17,7 @@ using Microsoft.DotNet.VersionTools.Automation;
 using Microsoft.DotNet.VersionTools.Automation.GitHubApi;
 using Newtonsoft.Json;
 
-namespace FilePusher
+namespace Microsoft.DotNet.Docker.Tools.FilePusher
 {
     public class FilePusher
     {
