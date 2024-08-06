@@ -11,6 +11,7 @@ namespace Microsoft.DotNet.ImageBuilder
     public static class GraphExtensions
     {
         public static IEnumerable<IEnumerable<T>> GetCompleteSubgraphs<T>(this IEnumerable<T> source, Func<T, IEnumerable<T>> getParents)
+            where T : notnull
         {
             List<T[]> subgraphs = new List<T[]>();
 
@@ -26,6 +27,7 @@ namespace Microsoft.DotNet.ImageBuilder
         }
 
         private static List<Node<T>> CreateNodeList<T>(IEnumerable<T> source, Func<T, IEnumerable<T>> getParents)
+            where T : notnull
         {
             Dictionary<T, Node<T>> nodes = new Dictionary<T, Node<T>>();
 
@@ -38,8 +40,9 @@ namespace Microsoft.DotNet.ImageBuilder
         }
 
         private static Node<T> CreateNode<T>(T item, Dictionary<T, Node<T>> nodes, Func<T, IEnumerable<T>> getParents)
+            where T : notnull
         {
-            if (nodes.TryGetValue(item, out Node<T> itemNode))
+            if (nodes.TryGetValue(item, out Node<T>? itemNode))
             {
                 return itemNode;
             }
@@ -68,11 +71,11 @@ namespace Microsoft.DotNet.ImageBuilder
             }
         }
 
-        private class Node<T>
+        private record Node<T>
         {
-            public T Item;
-            public List<Node<T>> Parents { get; } = new List<Node<T>>();
-            public List<Node<T>> Children { get; } = new List<Node<T>>();
+            public required T Item { get; init; }
+            public List<Node<T>> Parents { get; init; } = [];
+            public List<Node<T>> Children { get; init; } = [];
         }
     }
 }

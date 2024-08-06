@@ -28,12 +28,12 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
             Logger.WriteHeading("GENERATING DOCKERFILES");
 
             await GenerateArtifactsAsync(
-                Manifest.GetFilteredPlatforms(),
-                (platform) => platform.DockerfileTemplate,
-                (platform) => platform.DockerfilePath,
-                (platform, templatePath, indent) => GetTemplateState(platform, templatePath, indent),
-                nameof(Platform.DockerfileTemplate),
-                "Dockerfile");
+                contexts: Manifest.GetFilteredPlatforms(),
+                getTemplatePath: (platform) => platform.DockerfileTemplate,
+                getArtifactPath: (platform) => platform.DockerfilePath,
+                getState: GetTemplateState,
+                templatePropertyName: nameof(Platform.DockerfileTemplate),
+                artifactName: "Dockerfile");
 
             ValidateArtifacts();
         }
@@ -48,11 +48,12 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
                 platform,
                 (platform, templatePath, currentIndent) => GetTemplateState(platform, templatePath, currentIndent + indent),
                 indent);
+
             symbols["ARCH_SHORT"] = platform.Model.Architecture.GetShortName();
             symbols["ARCH_NUPKG"] = platform.Model.Architecture.GetNupkgName();
             symbols["ARCH_VERSIONED"] = versionedArch;
             symbols["ARCH_TAG_SUFFIX"] = $"-{versionedArch}";
-            symbols["PRODUCT_VERSION"] = image.ProductVersion;
+            symbols["PRODUCT_VERSION"] = image.ProductVersion ?? "";
             symbols["OS_VERSION"] = platform.Model.OsVersion;
             symbols["OS_VERSION_BASE"] = platform.BaseOsVersion;
             symbols["OS_VERSION_NUMBER"] = GetOsVersionNumber(platform);

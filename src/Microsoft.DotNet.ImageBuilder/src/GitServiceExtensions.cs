@@ -12,7 +12,7 @@ namespace Microsoft.DotNet.ImageBuilder
             this IGitService gitService,
             PlatformInfo platform,
             string sourceRepoUrl,
-            string sourceBranch = null)
+            string? sourceBranch = null)
         {
             string branchOrShaPathSegment = sourceBranch ??
                 gitService.GetCommitSha(platform.DockerfilePath, useFullHash: true);

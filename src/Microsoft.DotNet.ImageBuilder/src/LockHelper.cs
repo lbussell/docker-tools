@@ -27,10 +27,10 @@ namespace Microsoft.DotNet.ImageBuilder
             return value;
         }
 
-        public static TValue DoubleCheckedLockLookup<TKey, TValue>(
-            object lockObj, IDictionary<TKey, TValue> dictionary, TKey key, Func<TValue> getValue, Func<TValue, bool> addToDictionary = null)
+        public static TValue? DoubleCheckedLockLookup<TKey, TValue>(
+            object lockObj, IDictionary<TKey, TValue> dictionary, TKey key, Func<TValue> getValue, Func<TValue, bool>? addToDictionary = null)
         {
-            if (!dictionary.TryGetValue(key, out TValue value))
+            if (!dictionary.TryGetValue(key, out TValue? value))
             {
                 lock (lockObj)
                 {
@@ -69,22 +69,35 @@ namespace Microsoft.DotNet.ImageBuilder
         }
 
         public static async Task<TValue> DoubleCheckedLockLookupAsync<TKey, TValue>(
-            this SemaphoreSlim semaphore, IDictionary<TKey, TValue> dictionary, TKey key, Func<Task<TValue>> getValue, Func<TValue, bool> addToDictionary = null)
+            this SemaphoreSlim semaphore,
+            IDictionary<TKey, TValue> dictionary,
+            TKey key,
+            Func<Task<TValue>> getValue,
+            Func<TValue, bool>? addToDictionaryCheck = null)
         {
-            if (!dictionary.TryGetValue(key, out TValue value))
+            if (dictionary.TryGetValue(key, out TValue? value))
             {
-                await semaphore.LockAsync(async () =>
-                {
-                    if (!dictionary.TryGetValue(key, out value))
-                    {
-                        value = await getValue();
+                return value;
+            }
 
-                        if (addToDictionary is null || addToDictionary(value))
-                        {
-                            dictionary.Add(key, value);
-                        }
-                    }
-                });
+            await semaphore.WaitAsync();
+
+            try
+            {
+                if (dictionary.TryGetValue(key, out value))
+                {
+                    return value;
+                }
+
+                value = await getValue();
+                if (addToDictionaryCheck is null || addToDictionaryCheck(value))
+                {
+                    dictionary.Add(key, value);
+                }
+            }
+            finally
+            {
+                semaphore.Release();
             }
 
             return value;

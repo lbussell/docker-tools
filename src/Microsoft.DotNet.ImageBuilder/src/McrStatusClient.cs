@@ -19,7 +19,7 @@ namespace Microsoft.DotNet.ImageBuilder
         // https://msazure.visualstudio.com/MicrosoftContainerRegistry/_git/docs?path=/status/status_v2.yaml
         private const string BaseUri = "https://status.mscr.io/api/onboardingstatus/v2";
         private readonly HttpClient _httpClient;
-        private readonly AsyncLockedValue<string> _accessToken = new AsyncLockedValue<string>();
+        private readonly Lazy<Task<string>> _accessToken;
         private readonly AsyncPolicy<HttpResponseMessage> _httpPolicy;
         private readonly ILoggerService _loggerService;
         private readonly IAzureTokenCredentialProvider _tokenCredentialProvider;
@@ -30,10 +30,11 @@ namespace Microsoft.DotNet.ImageBuilder
             ArgumentNullException.ThrowIfNull(loggerService);
             ArgumentNullException.ThrowIfNull(httpClientProvider);
 
+            _accessToken = new(GetAccessTokenAsync);
             _httpClient = httpClientProvider.GetClient();
             _httpPolicy = HttpPolicyBuilder.Create()
                 .WithMeteredRetryPolicy(loggerService)
-                .WithRefreshAccessTokenPolicy(RefreshAccessTokenAsync, loggerService)
+                .WithRefreshAccessTokenPolicy(() => _accessToken.Value, loggerService)
                 .WithNotFoundRetryPolicy(TimeSpan.FromHours(1), TimeSpan.FromSeconds(10), loggerService)
                 .Build() ?? throw new InvalidOperationException("Policy should not be null");
             _loggerService = loggerService;
@@ -67,15 +68,14 @@ namespace Microsoft.DotNet.ImageBuilder
         private async Task<T> SendRequestAsync<T>(Func<HttpRequestMessage> message)
         {
             HttpResponseMessage response = await _httpClient.SendRequestAsync(message, GetAccessTokenAsync, _httpPolicy);
-            return JsonConvert.DeserializeObject<T>(await response.Content.ReadAsStringAsync());
+            string responseString = await response.Content.ReadAsStringAsync();
+            return JsonConvert.DeserializeObject<T>(responseString) ??
+                throw new InvalidOperationException($"Got null when deserializing response. Response contents: {responseString}");
         }
 
-        private Task<string> GetAccessTokenAsync() =>
-            _accessToken.GetValueAsync(async () =>
-                (await _tokenCredentialProvider.GetTokenAsync(AzureScopes.McrStatusScope)).Token);
-
-        private Task RefreshAccessTokenAsync() =>
-            _accessToken.ResetValueAsync(async () =>
-                (await _tokenCredentialProvider.GetTokenAsync(AzureScopes.McrStatusScope)).Token);
+        private async Task<string> GetAccessTokenAsync()
+        {
+            return (await _tokenCredentialProvider.GetTokenAsync(AzureScopes.McrStatusScope)).Token;
+        }
     }
 }

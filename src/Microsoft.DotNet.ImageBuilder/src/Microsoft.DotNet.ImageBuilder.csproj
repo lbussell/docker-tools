@@ -5,6 +5,7 @@
     <PublishTrimmed>False</PublishTrimmed>
     <TargetFramework>net8.0</TargetFramework>
     <RootNamespace>Microsoft.DotNet.ImageBuilder</RootNamespace>
+    <Nullable>enable</Nullable>
   </PropertyGroup>
 
   <ItemGroup>

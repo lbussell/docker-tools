@@ -12,7 +12,7 @@ namespace Microsoft.DotNet.ImageBuilder.ViewModel
 {
     public static class ModelExtensions
     {
-        public static string GetDisplayName(this Architecture architecture, string variant = null)
+        public static string GetDisplayName(this Architecture architecture, string? variant = null)
         {
             string displayName = architecture switch
             {
@@ -85,7 +85,7 @@ namespace Microsoft.DotNet.ImageBuilder.ViewModel
             }
         }
 
-        public static void ValidateFileReference(string path, string manifestDirectory)
+        public static void ValidateFileReference(string? path, string manifestDirectory)
         {
             ValidatePathIsRelative(path);
 
@@ -95,7 +95,7 @@ namespace Microsoft.DotNet.ImageBuilder.ViewModel
             }
         }
 
-        private static void ValidatePathIsRelative(string path)
+        private static void ValidatePathIsRelative(string? path)
         {
             if (Path.IsPathRooted(path))
             {

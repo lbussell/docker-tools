@@ -18,7 +18,7 @@ namespace Microsoft.DotNet.ImageBuilder
 {
     public static class ImageBuilder
     {
-        private static CompositionContainer s_container;
+        private static CompositionContainer? s_container;
 
         private static CompositionContainer Container
         {
@@ -26,8 +26,10 @@ namespace Microsoft.DotNet.ImageBuilder
             {
                 if (s_container == null)
                 {
-                    string dllLocation = Assembly.GetExecutingAssembly().Location;
-                    DirectoryCatalog catalog = new(Path.GetDirectoryName(dllLocation), Path.GetFileName(dllLocation));
+                    string dllFilePath = Assembly.GetExecutingAssembly().Location;
+                    string dllContainingDirectory = Path.GetDirectoryName(dllFilePath) ??
+                        throw new InvalidOperationException($"Unable to resolve path to executing assembly.");
+                    DirectoryCatalog catalog = new(dllContainingDirectory, Path.GetFileName(dllFilePath));
                     s_container = new CompositionContainer(catalog, CompositionOptions.DisableSilentRejection);
                 }
 

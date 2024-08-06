@@ -9,7 +9,6 @@ using System.Linq;
 using System.Reflection;
 using static Microsoft.DotNet.ImageBuilder.Commands.CliHelper;
 
-#nullable enable
 namespace Microsoft.DotNet.ImageBuilder.Commands
 {
     public class Options : IOptions
@@ -19,17 +18,13 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
 
         public string? GetOption(string name)
         {
-            string? result;
+            string? result = null;
 
             PropertyInfo? propInfo = GetType().GetProperties()
                 .FirstOrDefault(p => string.Equals(p.Name, name, StringComparison.Ordinal));
             if (propInfo != null)
             {
                 result = propInfo.GetValue(this)?.ToString() ?? "";
-            }
-            else
-            {
-                result = null;
             }
 
             return result;
@@ -49,4 +44,3 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
             };
     }
 }
-#nullable disable

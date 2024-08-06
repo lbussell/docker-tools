@@ -47,7 +47,9 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
         public override async Task ExecuteAsync()
         {
             string subscriptionsJson = File.ReadAllText(Options.SubscriptionsPath);
-            Subscription[] subscriptions = JsonConvert.DeserializeObject<Subscription[]>(subscriptionsJson);
+            Subscription[] subscriptions = JsonConvert.DeserializeObject<Subscription[]>(subscriptionsJson)
+                ?? throw new InvalidOperationException($"Unable to read subscriptions json from {Options.SubscriptionsPath}");
+
             IEnumerable<SubscriptionImagePaths> imagePathsBySubscription = GetAllSubscriptionImagePaths();
 
             if (imagePathsBySubscription.Any())

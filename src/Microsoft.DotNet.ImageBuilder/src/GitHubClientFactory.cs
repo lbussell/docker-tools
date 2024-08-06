@@ -121,7 +121,7 @@ namespace Microsoft.DotNet.ImageBuilder
                 RetryHelper.GetWaitAndRetryPolicy<Exception>(_loggerService)
                     .ExecuteAsync(() => _innerClient.SearchPullRequestsAsync(project, headPrefix, author, sortType));
 
-            public Task UpdateGitHubPullRequestAsync(GitHubProject project, int number, string title = null, string body = null, string state = null, bool? maintainersCanModify = null)
+            public Task UpdateGitHubPullRequestAsync(GitHubProject project, int number, string? title = null, string? body = null, string? state = null, bool? maintainersCanModify = null)
             {
                 EnsureNotDryRun();
                 return UpdateGitHubPullRequestAsync(project, number, title, body, state, maintainersCanModify);

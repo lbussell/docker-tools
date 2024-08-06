@@ -28,7 +28,7 @@ namespace Microsoft.DotNet.ImageBuilder.ViewModel
         private Manifest Manifest { get; set; }
         private IManifestOptionsInfo Options { get; set; }
 
-        public IDictionary<string, string?> ResolvedVariables { get; } = new Dictionary<string, string?>();
+        public IDictionary<string, string> ResolvedVariables { get; } = new Dictionary<string, string>();
 
         public VariableHelper(Manifest manifest, IManifestOptionsInfo options, Func<string, RepoInfo> getRepoById)
         {
@@ -38,16 +38,12 @@ namespace Microsoft.DotNet.ImageBuilder.ViewModel
 
             if (Manifest.Variables is not null)
             {
-                foreach (KeyValuePair<string, string?> kvp in Manifest.Variables)
+                foreach (KeyValuePair<string, string> kvp in Manifest.Variables)
                 {
-                    string? variableValue;
+                    string variableValue = kvp.Value;
                     if (Options.Variables is not null && Options.Variables.TryGetValue(kvp.Key, out string? overridenValue))
                     {
                         variableValue = overridenValue;
-                    }
-                    else
-                    {
-                        variableValue = kvp.Value;
                     }
 
                     variableValue = SubstituteValues(variableValue);
@@ -58,7 +54,7 @@ namespace Microsoft.DotNet.ImageBuilder.ViewModel
             // Include any variables exclusively defined in the options
             if (Options.Variables is not null)
             {
-                foreach (KeyValuePair<string, string?> kvp in Options.Variables)
+                foreach (KeyValuePair<string, string> kvp in Options.Variables)
                 {
                     if (!ResolvedVariables.ContainsKey(kvp.Key))
                     {
@@ -69,25 +65,16 @@ namespace Microsoft.DotNet.ImageBuilder.ViewModel
             }
         }
 
-        public string? SubstituteValues(string? expression, Func<string, string, string>? getContextBasedSystemValue = null)
+        public string SubstituteValues(string expression, Func<string, string, string>? getContextBasedSystemValue = null)
         {
-            if (expression == null)
-            {
-                return null;
-            }
-
             foreach (Match match in Regex.Matches(expression, s_tagVariablePattern))
             {
-                string? variableValue;
                 string variableName = match.Groups[VariableGroupName].Value;
+                string? variableValue = GetUserValue(variableName);
 
                 if (variableName.Contains(BuiltInDelimiter))
                 {
                     variableValue = GetBuiltInValue(variableName, getContextBasedSystemValue);
-                }
-                else
-                {
-                    variableValue = GetUserValue(variableName);
                 }
 
                 if (variableValue == null)

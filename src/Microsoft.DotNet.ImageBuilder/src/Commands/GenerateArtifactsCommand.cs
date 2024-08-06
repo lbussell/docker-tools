@@ -40,12 +40,12 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
 
         protected async Task GenerateArtifactsAsync<TContext>(
             IEnumerable<TContext> contexts,
-            Func<TContext, string> getTemplatePath,
+            Func<TContext, string?> getTemplatePath,
             Func<TContext, string> getArtifactPath,
             GetTemplateState<TContext> getState,
             string templatePropertyName,
             string artifactName,
-            Func<string, TContext, string> postProcess = null)
+            Func<string, TContext, string>? postProcess = null)
         {
             foreach (TContext context in contexts)
             {
@@ -55,7 +55,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
                     continue;
                 }
 
-                string templatePath = getTemplatePath(context);
+                string? templatePath = getTemplatePath(context);
                 if (templatePath == null)
                 {
                     if (Options.AllowOptionalTemplates)
@@ -70,7 +70,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
                 // There may be some artifact files which are referenced more than once in different contexts. Since we can only
                 // generate the artifact once, we take the approach of first-one-wins. Once an artifact has been generated once,
                 // it doesn't get generated again during the running of this command.
-                if (generatedArtifacts.TryGetValue(artifactPath, out string originalTemplatePath))
+                if (generatedArtifacts.TryGetValue(artifactPath, out string? originalTemplatePath))
                 {
                     if (originalTemplatePath != templatePath)
                     {
@@ -93,38 +93,46 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
             TContext context,
             GetTemplateState<TContext> getState,
             string artifactName,
-            Func<string, TContext, string> postProcess)
+            Func<string, TContext, string>? postProcess)
         {
             Logger.WriteSubheading($"Generating '{artifactPath}' from '{templatePath}'");
 
-            string generatedArtifact = await RenderTemplateAsync(templatePath, context, getState, Value.EmptyMap, null, trimTemplate: false);
+            string? generatedArtifact = await RenderTemplateAsync(
+                templatePath: templatePath,
+                context: context,
+                getTemplateState: getState,
+                templateArgs: Value.EmptyMap,
+                currentIndent: string.Empty,
+                trimTemplate: false);
 
-            if (generatedArtifact != null)
+            if (generatedArtifact is null)
             {
-                if (postProcess != null)
-                {
-                    generatedArtifact = postProcess(generatedArtifact, context);
-                }
+                return;
+            }
 
-                string currentArtifact = File.Exists(artifactPath) ?
-                    await File.ReadAllTextAsync(artifactPath) : string.Empty;
-                if (currentArtifact == generatedArtifact)
-                {
-                    Logger.WriteMessage($"{artifactName} in sync with template");
-                }
-                else if (Options.Validate)
-                {
-                    int differIndex = StringExtensions.DiffersAtIndex(currentArtifact, generatedArtifact);
-                    Logger.WriteError($"{artifactName} out of sync with template starting at index '{differIndex}'{Environment.NewLine}"
-                        + $"Current:   '{GetSnippet(currentArtifact, differIndex)}'{Environment.NewLine}"
-                        + $"Generated: '{GetSnippet(generatedArtifact, differIndex)}'");
-                    _outOfSyncArtifacts.Add(artifactPath);
-                }
-                else if (!Options.IsDryRun)
-                {
-                    await File.WriteAllTextAsync(artifactPath, generatedArtifact);
-                    Logger.WriteMessage($"Updated '{artifactPath}'");
-                }
+            if (postProcess != null)
+            {
+                generatedArtifact = postProcess(generatedArtifact, context);
+            }
+
+            string currentArtifact = File.Exists(artifactPath) ?
+                await File.ReadAllTextAsync(artifactPath) : string.Empty;
+            if (currentArtifact == generatedArtifact)
+            {
+                Logger.WriteMessage($"{artifactName} in sync with template");
+            }
+            else if (Options.Validate)
+            {
+                int differIndex = StringExtensions.DiffersAtIndex(currentArtifact, generatedArtifact);
+                Logger.WriteError($"{artifactName} out of sync with template starting at index '{differIndex}'{Environment.NewLine}"
+                    + $"Current:   '{GetSnippet(currentArtifact, differIndex)}'{Environment.NewLine}"
+                    + $"Generated: '{GetSnippet(generatedArtifact, differIndex)}'");
+                _outOfSyncArtifacts.Add(artifactPath);
+            }
+            else if (!Options.IsDryRun)
+            {
+                await File.WriteAllTextAsync(artifactPath, generatedArtifact);
+                Logger.WriteMessage($"Updated '{artifactPath}'");
             }
         }
 
@@ -143,19 +151,23 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
                 ["InsertTemplate"] = Value.FromFunction(
                     Function.CreatePure(
                         (state, args) =>
-                            RenderTemplateAsync(
-                                Path.Combine(Path.GetDirectoryName(sourceTemplatePath), args[0].AsString),
-                                context,
-                                getTemplateState,
-                                args.Count > 1 ? args[1] : Value.EmptyMap,
-                                args.Count > 2 ? args[2].AsString : null,
-                                trimTemplate: true).Result,
+                        {
+                            string sourceTemplateDirectory = Path.GetDirectoryName(sourceTemplatePath) ?? string.Empty;
+                            return RenderTemplateAsync(
+                                templatePath: Path.Combine(sourceTemplateDirectory, args[0].AsString),
+                                context: context,
+                                getTemplateState: getTemplateState,
+                                templateArgs: args.Count > 1 ? args[1] : Value.EmptyMap,
+                                currentIndent: args.Count > 2 ? args[2].AsString : "",
+                                trimTemplate: true).Result ??
+                                    string.Empty;
+                        },
                         min: 1,
                         max: 3))
             };
         }
 
-        protected async Task<string> RenderTemplateAsync<TContext>(
+        protected async Task<string?> RenderTemplateAsync<TContext>(
             string templatePath,
             TContext context,
             GetTemplateState<TContext> getTemplateState,
@@ -163,7 +175,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
             string currentIndent,
             bool trimTemplate)
         {
-            string artifact = null;
+            string? artifact = null;
 
             string template = await File.ReadAllTextAsync(templatePath);
 
