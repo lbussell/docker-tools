@@ -80,7 +80,7 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
 
             WaitForMcrDocIngestionCommand command = new(
                 Mock.Of<ILoggerService>(),
-                statusClientMock.Object,
+                MarImageIngestionReporterTests.CreateStatusClientFactoryMock(statusClientMock.Object),
                 environmentServiceMock.Object);
 
             command.Options.CommitDigest = commitDigest;
@@ -168,7 +168,7 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
 
             WaitForMcrDocIngestionCommand command = new WaitForMcrDocIngestionCommand(
                 Mock.Of<ILoggerService>(),
-                statusClientMock.Object,
+                MarImageIngestionReporterTests.CreateStatusClientFactoryMock(statusClientMock.Object),
                 environmentServiceMock.Object);
 
             command.Options.CommitDigest = commitDigest;
@@ -267,7 +267,7 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
 
             WaitForMcrDocIngestionCommand command = new(
                 Mock.Of<ILoggerService>(),
-                statusClientMock.Object,
+                MarImageIngestionReporterTests.CreateStatusClientFactoryMock(statusClientMock.Object),
                 environmentServiceMock.Object);
 
             command.Options.CommitDigest = commitDigest;
@@ -357,7 +357,7 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
 
             WaitForMcrDocIngestionCommand command = new WaitForMcrDocIngestionCommand(
                 Mock.Of<ILoggerService>(),
-                statusClientMock.Object,
+                MarImageIngestionReporterTests.CreateStatusClientFactoryMock(statusClientMock.Object),
                 environmentServiceMock.Object);
 
             command.Options.CommitDigest = commitDigest;
@@ -397,7 +397,7 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
 
             WaitForMcrDocIngestionCommand command = new(
                 Mock.Of<ILoggerService>(),
-                statusClientMock.Object,
+                MarImageIngestionReporterTests.CreateStatusClientFactoryMock(statusClientMock.Object),
                 environmentServiceMock.Object);
 
             command.Options.CommitDigest = commitDigest;

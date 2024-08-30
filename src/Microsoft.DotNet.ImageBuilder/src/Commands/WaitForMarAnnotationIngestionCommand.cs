@@ -4,6 +4,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.CommandLine;
 using System.ComponentModel.Composition;
 using System.IO;
 using System.Linq;
@@ -30,6 +31,12 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
 
         public override async Task ExecuteAsync()
         {
+            if (string.IsNullOrWhiteSpace(Options.IngestionOptions.StatusApiResourceId))
+            {
+                throw new InvalidOperationException(
+                    $"Missing required command line option {MarIngestionOptions.StatusApiResourceIdName}");
+            }
+
             _loggerService.WriteHeading("WAITING FOR ANNOTATION INGESTION");
 
             string[] annotationDigests = File.ReadAllLines(Options.AnnotationDigestsPath);
@@ -46,7 +53,12 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
 
             if (!Options.IsDryRun)
             {
-                await _imageIngestionReporter.ReportImageStatusesAsync(digests, Options.IngestionOptions.WaitTimeout, Options.IngestionOptions.RequeryDelay, minimumQueueTime: null);
+                await _imageIngestionReporter.ReportImageStatusesAsync(
+                    marStatusApiResourceId: Options.IngestionOptions.StatusApiResourceId,
+                    digestInfos: digests,
+                    timeout: Options.IngestionOptions.WaitTimeout,
+                    requeryDelay: Options.IngestionOptions.RequeryDelay,
+                    minimumQueueTime: null);
             }
         }
     }

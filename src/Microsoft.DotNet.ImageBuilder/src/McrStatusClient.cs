@@ -8,24 +8,46 @@ using System.Net.Http;
 using System.Threading.Tasks;
 using Microsoft.DotNet.ImageBuilder.Models.McrStatus;
 using Newtonsoft.Json;
+using Azure.Core;
 using Polly;
 
 #nullable enable
 namespace Microsoft.DotNet.ImageBuilder
 {
-    [Export(typeof(IMcrStatusClient))]
+    public interface IMcrStatusClientFactory
+    {
+        public IMcrStatusClient Create(string marStatusApiResourceId);
+    }
+
+    [Export(typeof(IMcrStatusClientFactory))]
+    [method: ImportingConstructor]
+    public class McrStatusClientFactory(
+        IHttpClientProvider httpClientProvider,
+        ILoggerService loggerService,
+        IAzureTokenCredentialProvider tokenCredentialProvider)
+    {
+        private readonly IHttpClientProvider _httpClientProvider = httpClientProvider;
+        private readonly ILoggerService _loggerService = loggerService;
+        private readonly IAzureTokenCredentialProvider _tokenCredentialProvider = tokenCredentialProvider;
+
+        public IMcrStatusClient Create(string marStatusApiResourceId) =>
+            new McrStatusClient(_httpClientProvider, _loggerService, _tokenCredentialProvider, marStatusApiResourceId);
+    }
+
     public class McrStatusClient : IMcrStatusClient
     {
         // https://msazure.visualstudio.com/MicrosoftContainerRegistry/_git/docs?path=/status/status_v2.yaml
         private const string BaseUri = "https://status.mscr.io/api/onboardingstatus/v2";
         private readonly HttpClient _httpClient;
-        private readonly AsyncLockedValue<string> _accessToken = new AsyncLockedValue<string>();
+        private readonly Lazy<Task<AccessToken>> _accessToken;
         private readonly AsyncPolicy<HttpResponseMessage> _httpPolicy;
-        private readonly ILoggerService _loggerService;
         private readonly IAzureTokenCredentialProvider _tokenCredentialProvider;
 
-        [ImportingConstructor]
-        public McrStatusClient(IHttpClientProvider httpClientProvider, ILoggerService loggerService, IAzureTokenCredentialProvider tokenCredentialProvider)
+        public McrStatusClient(
+            IHttpClientProvider httpClientProvider,
+            ILoggerService loggerService,
+            IAzureTokenCredentialProvider tokenCredentialProvider,
+            string marStatusApiResourceId)
         {
             ArgumentNullException.ThrowIfNull(loggerService);
             ArgumentNullException.ThrowIfNull(httpClientProvider);
@@ -36,8 +58,10 @@ namespace Microsoft.DotNet.ImageBuilder
                 .WithRefreshAccessTokenPolicy(RefreshAccessTokenAsync, loggerService)
                 .WithNotFoundRetryPolicy(TimeSpan.FromHours(1), TimeSpan.FromSeconds(10), loggerService)
                 .Build() ?? throw new InvalidOperationException("Policy should not be null");
-            _loggerService = loggerService;
+
             _tokenCredentialProvider = tokenCredentialProvider;
+            _accessToken = new Lazy<Task<AccessToken>>(
+                () => _tokenCredentialProvider.GetTokenAsync(marStatusApiResourceId).AsTask());
         }
 
         public Task<ImageResult> GetImageResultAsync(string imageDigest)
@@ -67,15 +91,17 @@ namespace Microsoft.DotNet.ImageBuilder
         private async Task<T> SendRequestAsync<T>(Func<HttpRequestMessage> message)
         {
             HttpResponseMessage response = await _httpClient.SendRequestAsync(message, GetAccessTokenAsync, _httpPolicy);
-            return JsonConvert.DeserializeObject<T>(await response.Content.ReadAsStringAsync());
+            string responseContent = await response.Content.ReadAsStringAsync();
+
+            return JsonConvert.DeserializeObject<T>(responseContent) ??
+                throw new InvalidOperationException($"""
+                    Got null when deserializing {typeof(T).FullName} from response content:
+                    {await response.Content.ReadAsStringAsync()}
+                    """);
         }
 
-        private Task<string> GetAccessTokenAsync() =>
-            _accessToken.GetValueAsync(async () =>
-                (await _tokenCredentialProvider.GetTokenAsync(AzureScopes.McrStatusScope)).Token);
+        private async Task<string> GetAccessTokenAsync() => (await _accessToken.Value).Token;
 
-        private Task RefreshAccessTokenAsync() =>
-            _accessToken.ResetValueAsync(async () =>
-                (await _tokenCredentialProvider.GetTokenAsync(AzureScopes.McrStatusScope)).Token);
+        private Task<string> RefreshAccessTokenAsync() => GetAccessTokenAsync();
     }
 }

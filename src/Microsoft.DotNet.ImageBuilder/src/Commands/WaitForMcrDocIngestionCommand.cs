@@ -15,16 +15,19 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
     public class WaitForMcrDocIngestionCommand : Command<WaitForMcrDocIngestionOptions, WaitForMcrDocIngestionOptionsBuilder>
     {
         private readonly ILoggerService _loggerService;
-        private readonly IMcrStatusClient _mcrStatusClient;
+        private readonly Lazy<IMcrStatusClient> _mcrStatusClient;
         private readonly IEnvironmentService _environmentService;
 
         [ImportingConstructor]
         public WaitForMcrDocIngestionCommand(
-            ILoggerService loggerService, IMcrStatusClient mcrStatusClient, IEnvironmentService environmentService)
+            ILoggerService loggerService, IMcrStatusClientFactory mcrStatusClientFactory, IEnvironmentService environmentService)
         {
             _loggerService = loggerService ?? throw new ArgumentNullException(nameof(loggerService));
-            _mcrStatusClient = mcrStatusClient ?? throw new ArgumentNullException(nameof(mcrStatusClient));
             _environmentService = environmentService ?? throw new ArgumentNullException(nameof(environmentService));
+
+            ArgumentNullException.ThrowIfNull(mcrStatusClientFactory);
+            _mcrStatusClient = new Lazy<IMcrStatusClient>(() =>
+                mcrStatusClientFactory.Create(Options.IngestionOptions.StatusApiResourceId));
         }
 
         protected override string Description => "Waits for docs to complete ingestion into Docker Hub";
@@ -35,7 +38,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
 
             if (!Options.IsDryRun)
             {
-                CommitResult result = await WaitForIngestionAsync(_mcrStatusClient);
+                CommitResult result = await WaitForIngestionAsync(_mcrStatusClient.Value);
 
                 LogSuccessfulResults(result);
             }
