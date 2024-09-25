@@ -46,7 +46,9 @@ namespace Microsoft.DotNet.ImageBuilder
                 .Select(buildArg => $" --build-arg {buildArg.Key}={buildArg.Value}");
             string buildArgsString = string.Join(string.Empty, buildArgList);
 
-            string dockerArgs = $"build --platform {platform} {tagArgs} -f {dockerfilePath}{buildArgsString} {buildContextPath}";
+            string hyperVArg = DockerHelper.OS == OS.Windows ? " --isolation hyperv" : string.Empty;
+
+            string dockerArgs = $"build --platform {platform}{hyperVArg} {tagArgs} -f {dockerfilePath}{buildArgsString} {buildContextPath}";
 
             // Workaround for https://github.com/moby/buildkit/issues/1368
             // BuildKit caches Dockerfiles based on file size and timestamp.
