@@ -8,7 +8,7 @@ using System.Linq;
 using static Microsoft.DotNet.ImageBuilder.Commands.CliHelper;
 
 #nullable enable
-namespace Microsoft.DotNet.ImageBuilder.Commands
+namespace Microsoft.DotNet.ImageBuilder.Commands.GenerateBuildMatrix
 {
     public class GenerateBuildMatrixOptions : ManifestOptions, IFilterableOptions
     {

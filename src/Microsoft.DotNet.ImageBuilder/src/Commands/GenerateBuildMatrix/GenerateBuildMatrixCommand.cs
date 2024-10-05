@@ -14,7 +14,7 @@ using Microsoft.DotNet.ImageBuilder.Models.Manifest;
 using Microsoft.DotNet.ImageBuilder.ViewModel;
 
 #nullable enable
-namespace Microsoft.DotNet.ImageBuilder.Commands
+namespace Microsoft.DotNet.ImageBuilder.Commands.GenerateBuildMatrix
 {
     [Export(typeof(ICommand))]
     public class GenerateBuildMatrixCommand : ManifestCommand<GenerateBuildMatrixOptions, GenerateBuildMatrixOptionsBuilder>
@@ -312,16 +312,27 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
                 PlatformInfo platform = subgraph.First();
                 ImageInfo image = Manifest.GetImageByPlatform(platform);
                 string osVariant = platform.BaseOsVersion;
+
                 string? productVersion = GetProductVersion(image);
+                string productVersionPrefix = productVersion is not null
+                    ? productVersion + "-"
+                    : string.Empty;
+
                 BuildLegInfo leg = new()
                 {
-                    Name = $"{(productVersion is not null ? productVersion + "-" : string.Empty)}{osVariant}-{Manifest.GetRepoByImage(image).Id}"
+                    Name = $"{productVersionPrefix}{osVariant}-{Manifest.GetRepoByImage(image).Id}"
                         .Replace("/", "-")
                 };
+
                 matrix.Legs.Add(leg);
 
                 AddCommonVariables(platformGrouping, subgraph, leg);
-                leg.Variables.Add(("productVersion", productVersion));
+
+                if (productVersion is not null)
+                {
+                    leg.Variables.Add(("productVersion", productVersion));
+                }
+
                 leg.Variables.Add(("osVariant", osVariant));
                 AddImageBuilderPathsVariable(GetDockerfilePaths(subgraph).ToArray(), leg);
             }
@@ -616,4 +627,3 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
         }
     }
 }
-#nullable disable
