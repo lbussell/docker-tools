@@ -18,7 +18,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
     [Export(typeof(ICommand))]
     public class PublishManifestCommand : ManifestCommand<PublishManifestOptions, PublishManifestOptionsBuilder>
     {
-        private readonly Lazy<IManifestService> _manifestService;
+        private readonly Lazy<IManifestService> _IManifestService;
         private readonly IDockerService _dockerService;
         private readonly ILoggerService _loggerService;
         private readonly IDateTimeService _dateTimeService;
@@ -28,7 +28,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
 
         [ImportingConstructor]
         public PublishManifestCommand(
-            IManifestServiceFactory manifestServiceFactory,
+            IManifestServiceFactory IManifestServiceFactory,
             IDockerService dockerService,
             ILoggerService loggerService,
             IDateTimeService dateTimeService,
@@ -42,9 +42,9 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
             _tokenCredentialProvider = tokenCredentialProvider ?? throw new ArgumentNullException(nameof(tokenCredentialProvider));
 
             // Lazily create the Manifest Service so it can have access to Options (not available in this constructor)
-            ArgumentNullException.ThrowIfNull(manifestServiceFactory);
-            _manifestService = new Lazy<IManifestService>(() =>
-                manifestServiceFactory.Create(ownedAcr: Options.RegistryOverride, Options.CredentialsOptions));
+            ArgumentNullException.ThrowIfNull(IManifestServiceFactory);
+            _IManifestService = new Lazy<IManifestService>(() =>
+                IManifestServiceFactory.Create(ownedAcr: Options.RegistryOverride, Options.CredentialsOptions));
         }
 
         protected override string Description => "Creates and publishes the manifest to the Docker Registry";
@@ -108,7 +108,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
 
                 image.Manifest.Digest = DockerHelper.GetDigestString(
                     image.ManifestRepo.FullModelName,
-                    await _manifestService.Value.GetManifestDigestShaAsync(
+                    await _IManifestService.Value.GetManifestDigestShaAsync(
                         sharedTag.FullyQualifiedName, Options.IsDryRun));
 
                 IEnumerable<(string Repo, string Tag)> syndicatedRepresentativeSharedTags = image.ManifestImage.SharedTags
@@ -123,7 +123,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
                 {
                     string digest = DockerHelper.GetDigestString(
                         DockerHelper.GetImageName(Manifest.Model.Registry, syndicatedSharedTag.Repo),
-                        await _manifestService.Value.GetManifestDigestShaAsync(
+                        await _IManifestService.Value.GetManifestDigestShaAsync(
                             DockerHelper.GetImageName(Manifest.Registry, Options.RepoPrefix + syndicatedSharedTag.Repo, syndicatedSharedTag.Tag),
                             Options.IsDryRun));
                     image.Manifest.SyndicatedDigests.Add(digest);
