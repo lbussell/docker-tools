@@ -29,8 +29,16 @@ public class GenerateBuildMatrixCommand : ManifestCommand<GenerateBuildMatrixOpt
     private readonly Lazy<ImageNameResolverForMatrix> _imageNameResolver;
 
     [ImportingConstructor]
-    public GenerateBuildMatrixCommand(IImageCacheService imageCacheService, IManifestServiceFactory manifestServiceFactory) : base()
+    public GenerateBuildMatrixCommand(
+        IImageCacheService imageCacheService,
+        IManifestServiceFactory manifestServiceFactory,
+        IEnumerable<IMatrixGenerator> matrixGenerators) : base()
     {
+        foreach (var generator in matrixGenerators)
+        {
+            Console.WriteLine(generator.Key);
+        }
+
         _imageCacheService = imageCacheService ?? throw new ArgumentNullException(nameof(imageCacheService));
         _imageArtifactDetails = new Lazy<ImageArtifactDetails?>(() =>
         {
