@@ -14,12 +14,14 @@ FROM imagebuilder AS generate-readmes
 RUN [ \
     "/image-builder/Microsoft.DotNet.ImageBuilder", \
     "generateReadmes", \
+    "--no-version-logging", \
     "--manifest", "manifest.json", \
     "--var", "branch=nightly", \
     "'https://github.com/dotnet/dotnet-docker'" ]
 RUN [ \
     "/image-builder/Microsoft.DotNet.ImageBuilder", \
     "generateReadmes", \
+    "--no-version-logging", \
     "--manifest", "manifest.samples.json", \
     "--var", "branch=main", \
     "'https://github.com/dotnet/dotnet-docker'" ]
