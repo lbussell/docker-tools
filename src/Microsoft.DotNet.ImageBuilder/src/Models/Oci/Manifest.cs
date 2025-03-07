@@ -5,6 +5,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 #nullable enable
 namespace Microsoft.DotNet.ImageBuilder.Models.Oci;
@@ -19,9 +20,17 @@ public record Manifest
 
     public Dictionary<string, string> Annotations { get; init; } = [];
 
+    public List<Descriptor>? Layers { get; init; }
+
     public static Manifest FromJson(string json)
     {
         return JsonSerializer.Deserialize<Manifest>(json, s_jsonOptions)
             ?? throw new InvalidOperationException("Unable to deserialize manifest");
-    }   
+    }
+
+    public static Manifest FromJson(JsonObject jsonDocument)
+    {
+        return jsonDocument.Deserialize<Manifest>(s_jsonOptions)
+            ?? throw new InvalidOperationException("Unable to deserialize manifest");
+    }
 }

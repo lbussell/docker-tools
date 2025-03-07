@@ -70,7 +70,7 @@ internal static class ManifestServiceHelper
         foreach ((string image, IEnumerable<string> layers) in imageLayersResults)
         {
             manifestServiceMock
-                .Setup(o => o.GetImageLayersAsync(image, false))
+                .Setup(o => o.GetImageLayerDigestsAsync(image, false))
                 .ReturnsAsync(layers);
         }
 

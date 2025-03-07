@@ -5,8 +5,10 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Threading.Tasks;
+using Oci = Microsoft.DotNet.ImageBuilder.Models.Oci;
 
 #nullable enable
 namespace Microsoft.DotNet.ImageBuilder;
@@ -15,7 +17,13 @@ public interface IManifestService
 {
     Task<ManifestQueryResult> GetManifestAsync(string image, bool isDryRun);
 
-    public async Task<IEnumerable<string>> GetImageLayersAsync(string tag, bool isDryRun)
+    public async Task<IEnumerable<string>> GetImageLayerDigestsAsync(string tag, bool isDryRun)
+    {
+        var layers = await GetImageLayersAsync(tag, isDryRun);
+        return layers.Select(layer => layer.Digest);
+    }
+
+    public async Task<List<Oci.Descriptor>> GetImageLayersAsync(string tag, bool isDryRun)
     {
         if (isDryRun)
         {
@@ -23,17 +31,18 @@ public interface IManifestService
         }
 
         ManifestQueryResult manifestResult = await GetManifestAsync(tag, isDryRun);
-        if (!manifestResult.Manifest.ContainsKey("layers"))
+        var manifest = Oci.Manifest.FromJson(manifestResult.Manifest);
+
+        if (manifest.Layers is null)
         {
             JsonArray manifests = (JsonArray)(manifestResult.Manifest["manifests"] ??
                 throw new InvalidOperationException("Expected manifests property"));
+
             throw new InvalidOperationException(
                 $"'{tag}' is expected to be a concrete tag with 1 manifest. It has '{manifests.Count}' manifests.");
         }
 
-        return ((JsonArray)manifestResult.Manifest["layers"]!)
-            .Select(layer => (layer!["digest"] ?? throw new InvalidOperationException("Expected digest property")).ToString())
-            .Reverse();
+        return manifest.Layers;
     }
 
     public async Task<string?> GetLocalImageDigestAsync(string image, bool isDryRun)

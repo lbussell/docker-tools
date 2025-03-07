@@ -97,7 +97,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
                 // Log in again to refresh token as it may have expired from a long build
                 await ExecuteWithDockerCredentialsAsync(async () =>
                     {
-                        PushImages();
+                        await PushImages();
                         await PublishImageInfoAsync();
                     });
             }
@@ -260,7 +260,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
         {
             if (platform.Layers == null || !platform.Layers.Any())
             {
-                platform.Layers = (await _manifestService.Value.GetImageLayersAsync(tag, Options.IsDryRun)).ToList();
+                platform.Layers = (await _manifestService.Value.GetImageLayerDigestsAsync(tag, Options.IsDryRun)).ToList();
             }
         }
 
@@ -669,7 +669,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
             .SelectMany(imageData => imageData.Platforms)
             ?? Enumerable.Empty<PlatformData>();
 
-        private void PushImages()
+        private async Task PushImages()
         {
             if (Options.IsPushEnabled)
             {
@@ -678,6 +678,24 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
                 foreach (TagInfo tag in _processedTags)
                 {
                     _dockerService.PushImage(tag.FullyQualifiedName, Options.IsDryRun);
+
+                    try
+                    {
+                        var layers =
+                            await _manifestService.Value.GetImageLayersAsync(
+                                tag.FullyQualifiedName, Options.IsDryRun);
+
+                        var layerSizes = layers.Select(layer => layer.Size);
+                        var compressedSize = layerSizes.Sum();
+
+                        _loggerService.WriteMessage(
+                            $"'{tag.FullyQualifiedName}' Compressed size: {compressedSize}. " +
+                            $"Layer sizes: [{string.Join(", ", layerSizes)}]");
+                    }
+                    catch (Exception e)
+                    {
+                        _loggerService.WriteError($"Unable to get image size for '{tag.FullyQualifiedName}': {e.Message}");
+                    }
                 }
             }
         }
