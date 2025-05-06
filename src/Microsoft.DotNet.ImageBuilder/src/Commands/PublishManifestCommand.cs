@@ -73,17 +73,20 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
                 Options.IsDryRun,
                 async () =>
                 {
-                    IEnumerable<(RepoInfo repo, ImageInfo image)> manifests = Manifest.FilteredRepos
-                        .SelectMany(repo =>
-                            repo.FilteredImages
-                                .Where(image => image.SharedTags.Any())
-                                .Where(image => image.AllPlatforms
-                                    .Select(platform =>
-                                        ImageInfoHelper.GetMatchingPlatformData(platform, repo, imageArtifactDetails))
-                                    .Where(platformMapping => platformMapping != null)
-                                    .Any(platformMapping => !platformMapping?.Platform.IsUnchanged ?? false))
-                                .Select(image => (repo, image)))
-                        .ToList();
+                    // We want to generate manifests for an image if:
+                    // - The image has shared tags
+                    // - Any platform in the image was changed
+                    IEnumerable<(RepoInfo repo, ImageInfo image)> manifests =
+                        Manifest.FilteredRepos
+                            .SelectMany(
+                                repo => repo.FilteredImages
+                                    .Where(image => image.SharedTags.Any())
+                                    .Where(image => image.AllPlatforms
+                                        .Select(platform => ImageInfoHelper.GetMatchingPlatformData(platform, repo, imageArtifactDetails))
+                                        .Where(platformMapping => platformMapping != null)
+                                        .Any(platformMapping => !platformMapping?.Platform.IsUnchanged ?? false))
+                                    .Select(image => (repo, image)))
+                            .ToList();
 
                     Parallel.ForEach(manifests, ((RepoInfo Repo, ImageInfo Image) repoImage) =>
                     {
