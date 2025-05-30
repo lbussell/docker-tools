@@ -157,3 +157,5 @@ jobs:
         internalProjectName: ${{ parameters.internalProjectName }}
         publicProjectName: ${{ parameters.publicProjectName }}
         condition: ne(variables['BuildImages.builtImages'], '')
+        # SBOM artifacts do not need their own SBOM
+        optOutOfSbom: true

@@ -77,6 +77,8 @@ jobs:
       displayName: Publish SBOM Artifact
       internalProjectName: ${{ parameters.internalProjectName }}
       publicProjectName: ${{ parameters.publicProjectName }}
+      # SBOM artifacts do not need their own SBOM
+      optOutOfSbom: true
   - template: /eng/common/templates/steps/publish-artifact.yml@self
     parameters:
       condition: and(succeeded(), ne(variables['MergeImageInfoFiles.noImageInfos'], 'true'))

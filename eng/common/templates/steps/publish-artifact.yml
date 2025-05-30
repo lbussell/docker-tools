@@ -12,6 +12,9 @@ parameters:
 - name: condition
   type: string
   default: 'true'
+- name: optOutOfSbom
+  type: boolean
+  default: false
 
 steps:
 - ${{ if eq(variables['System.TeamProject'], parameters.internalProjectName) }}:
@@ -21,6 +24,8 @@ steps:
       artifact: ${{ parameters.artifactName }}
     displayName: ${{ parameters.displayName }}
     condition: and(succeeded(), ${{ parameters.condition }})
+    ${{ if parameters.optOutOfSbom }}:
+      sbomEnabled: false
 - ${{ if eq(variables['System.TeamProject'], parameters.publicProjectName) }}:
   - publish: ${{ parameters.path }}
     artifact: ${{ parameters.artifactName }}
