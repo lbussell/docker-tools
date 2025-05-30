@@ -14,21 +14,22 @@ parameters:
 
 stages:
 
-- stage: SetupServiceConnectionsStage
-  displayName: Setup service connections
-  jobs:
-
-  - job: SetupServiceConnectionsJob
+- ${{ if ne(parameters.serviceConnections.length, 0) }}:
+  - stage: SetupServiceConnectionsStage
     displayName: Setup service connections
-    pool: ${{ parameters.pool }}
-    steps:
+    jobs:
 
-    - ${{ each serviceConnection in parameters.serviceConnections }}:
-      - task: AzureCLI@2
-        displayName: Setup ${{ serviceConnection.name }}
-        inputs:
-          azureSubscription: ${{ serviceConnection.name }}
-          scriptType: pscore
-          scriptLocation: inlineScript
-          inlineScript: |
-            az account show
+    - job: SetupServiceConnectionsJob
+      displayName: Setup service connections
+      pool: ${{ parameters.pool }}
+      steps:
+
+      - ${{ each serviceConnection in parameters.serviceConnections }}:
+        - task: AzureCLI@2
+          displayName: Setup ${{ serviceConnection.name }}
+          inputs:
+            azureSubscription: ${{ serviceConnection.name }}
+            scriptType: pscore
+            scriptLocation: inlineScript
+            inlineScript: |
+              az account show
