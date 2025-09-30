@@ -222,12 +222,7 @@ namespace Microsoft.DotNet.ImageBuilder.ViewModel
             }
 
             // Append build args to distinguish platforms that only vary by arg values.
-            // Order by key to guarantee stable output.
-            string buildArgsSegment = string.Join(',', BuildArgs
-                .OrderBy(kvp => kvp.Key, StringComparer.Ordinal)
-                .Select(kvp => $"{kvp.Key}={kvp.Value ?? string.Empty}"));
-
-            return $"{key}-{buildArgsSegment}";
+            return $"{key}-{this.BuildArgsUniqueKey}";
         }
 
         private static string FormatVersionableOsName(string os, Func<string, string> formatName)
@@ -312,4 +307,3 @@ namespace Microsoft.DotNet.ImageBuilder.ViewModel
         }
     }
 }
-#nullable disable

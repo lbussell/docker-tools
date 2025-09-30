@@ -89,8 +89,18 @@ namespace Microsoft.DotNet.ImageBuilder.Models.Image
 
         // Product versions are considered equivalent if the major and minor segments are the same
         // See https://github.com/dotnet/docker-tools/issues/688
-        public string GetIdentifier(bool excludeProductVersion = false) =>
-            $"{Dockerfile}-{Architecture}-{OsType}-{OsVersion}{(excludeProductVersion ? "" : "-" + GetMajorMinorVersion())}";
+        public string GetIdentifier(bool excludeProductVersion = false)
+        {
+            string identifier = $"{Dockerfile}-{Architecture}-{OsType}-{OsVersion}{(excludeProductVersion ? "" : "-" + GetMajorMinorVersion())}";
+
+            string? buildArgsSegment = PlatformInfo?.BuildArgsUniqueKey;
+            if (!string.IsNullOrWhiteSpace(buildArgsSegment))
+            {
+                identifier += $"-{buildArgsSegment}";
+            }
+
+            return identifier;
+        }
 
         public bool HasDifferentTagState(PlatformData other) =>
             // If either of the platforms has no simple tags while the other does have simple tags, they are not equal
