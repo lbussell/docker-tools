@@ -13,11 +13,12 @@ internal static class ZotResourceBuilderExtensions
             .WithImage(ZotContainerImageTags.Image)
             .WithImageRegistry(ZotContainerImageTags.Registry)
             .WithImageTag(ZotContainerImageTags.Tag)
-            .WithEndpoint(
-                name: ZotResource.RegistryEndpointName,
+            .WithHttpEndpoint(
                 port: ZotContainerImageTags.HostPort,
                 targetPort: ZotContainerImageTags.ContainerPort,
-                scheme: "http")
+                name: ZotResource.RegistryEndpointName,
+                // This is needed or else pushing images won't work
+                isProxied: false)
             .WithUrlForEndpoint(
                 ZotResource.RegistryEndpointName,
                 url => url.DisplayText = "Browse images")

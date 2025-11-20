@@ -10,5 +10,5 @@ internal static class ZotContainerImageTags
     internal const string Image = "project-zot/zot";
     internal const string Tag = "v2.1.10";
     internal const int ContainerPort = 5000;
-    internal const int HostPort = 5000;
+    internal const int HostPort = 5001;
 }
