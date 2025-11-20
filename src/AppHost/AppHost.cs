@@ -9,7 +9,8 @@ using Microsoft.DotNet.DockerTools.AppHost.Resources;
 
 var builder = DistributedApplication.CreateBuilder(args);
 
-var registry = builder.AddZotRegistry("zot-registry");
+var registry = builder.AddZotRegistry("zot-registry")
+    .WithLifetime(ContainerLifetime.Persistent);
 
 builder.AddCSharpApp("ImageBuilder", "../ImageBuilder")
     .WaitFor(registry)
