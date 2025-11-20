@@ -10,12 +10,27 @@ using Microsoft.Extensions.DependencyInjection;
 
 var builder = DistributedApplication.CreateBuilder(args);
 
+// Add build/publish registry
 var registry = builder.AddZotRegistry("zot-registry")
     .WithLifetime(ContainerLifetime.Persistent);
 
+// Add kusto cluster for build telemetry
+var kustoClusterName = builder
+    .AddParameter("kustoClusterName", "Kusto cluster name")
+    .Hidden();
+var kustoClusterRg = builder
+    .AddParameter("kustoClusterResourceGroup", "Kusto cluster resource group")
+    .Hidden();
+var kusto = builder.AddAzureKustoCluster("dotnettel")
+    .RunAsEmulator()
+    .PublishAsExisting(kustoClusterName, kustoClusterRg)
+    .AddReadWriteDatabase("Telemetry", "Telemetry");
+
+// Add ImageBuilder
 builder.AddCSharpApp("ImageBuilder", "../ImageBuilder")
     .WaitFor(registry)
     .WithExplicitStart()
+    .WithReference(kusto)
     .WithEnvironment("publishConfig__buildAcr__server", registry.Resource.RegistryEndpoint)
     .WithEnvironment("publishConfig__publishAcr__server", registry.Resource.RegistryEndpoint)
     .WithCommand("build", "Build", async context =>
