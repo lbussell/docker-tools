@@ -15,7 +15,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
         public ManifestFilterOptions FilterOptions { get; set; } = new();
         public BaseImageOverrideOptions BaseImageOverrideOptions { get; set; } = new();
         public RegistryCredentialsOptions CredentialsOptions { get; set; } = new();
-        public ServiceConnectionOptions? AcrServiceConnection { get; set; }
+        // public ServiceConnectionOptions? AcrServiceConnection { get; set; }
         public ServiceConnectionOptions? StorageServiceConnection { get; set; }
 
         public bool IsPushEnabled { get; set; }
@@ -48,9 +48,6 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
             .._baseImageOverrideOptionsBuilder.GetCliOptions(),
             .._registryCredentialsOptionsBuilder.GetCliOptions(),
             .._serviceConnectionOptionsBuilder.GetCliOptions(
-                alias: "acr-service-connection",
-                propertyName: nameof(BuildOptions.AcrServiceConnection)),
-            .._serviceConnectionOptionsBuilder.GetCliOptions(
                 alias: "storage-service-connection",
                 propertyName: nameof(BuildOptions.StorageServiceConnection),
                 description: "Storage account to use for internal builds."),
@@ -77,10 +74,6 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
                 "Skips validation that ensures the Dockerfile's base image's platform matches the manifest configuration"),
             CreateOption<string>("digests-out-var", nameof(BuildOptions.OutputVariableName),
                 "Azure DevOps variable name to use for outputting the list of built image digests"),
-            CreateOption<string>("acr-subscription", nameof(BuildOptions.Subscription),
-                "Azure subscription to operate on"),
-            CreateOption<string>("acr-resource-group", nameof(BuildOptions.ResourceGroup),
-                "Azure resource group to operate on"),
             CreateOption<bool>("internal", nameof(BuildOptions.Internal),
                 "When true, all Dockerfiles will be passed the build arg ACCESSTOKEN containing the access token "
                 + "for the storage account specified by the storage-service-connection option. If used without the "

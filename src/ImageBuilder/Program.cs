@@ -13,6 +13,8 @@ using ICommand = Microsoft.DotNet.ImageBuilder.Commands.ICommand;
 
 try
 {
+    Console.WriteLine($"Received args: `{string.Join(" ", args)}`");
+
     RootCommand rootCliCommand = new();
 
     foreach (ICommand command in ImageBuilder.Commands)

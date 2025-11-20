@@ -20,7 +20,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
             ICopyImageServiceFactory copyImageServiceFactory,
             ILoggerService loggerService,
             IGitService gitService)
-            : base(copyImageServiceFactory, loggerService)
+            : base(copyImageServiceFactory, loggerService, null)
         {
             _gitService = gitService;
         }

@@ -10,8 +10,10 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Azure.Core;
+using Microsoft.DotNet.ImageBuilder.Configuration;
 using Microsoft.DotNet.ImageBuilder.Models.Image;
 using Microsoft.DotNet.ImageBuilder.ViewModel;
+using Microsoft.Extensions.Options;
 
 #nullable enable
 namespace Microsoft.DotNet.ImageBuilder.Commands
@@ -32,6 +34,8 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
         private readonly HashSet<PlatformData> _builtPlatforms = new();
         private readonly Lazy<ImageNameResolverForBuild> _imageNameResolver;
         private readonly Lazy<string?> _storageAccountToken;
+        // private readonly PublishConfiguration _publishConfiguration;
+        private readonly AcrConfiguration? _buildAcr;
 
         /// <summary>
         /// Maps a source digest from the image info file to the corresponding digest in the copied location for image caching.
@@ -50,7 +54,9 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
             IManifestServiceFactory manifestServiceFactory,
             IRegistryCredentialsProvider registryCredentialsProvider,
             IAzureTokenCredentialProvider tokenCredentialProvider,
-            IImageCacheService imageCacheService)
+            IImageCacheService imageCacheService,
+            IOptions<PublishConfiguration> publishConfiguration)
+            : base(publishConfiguration)
         {
             _dockerService = new DockerServiceCache(dockerService ?? throw new ArgumentNullException(nameof(dockerService)));
             _loggerService = loggerService ?? throw new ArgumentNullException(nameof(loggerService));
@@ -59,16 +65,18 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
             _registryCredentialsProvider = registryCredentialsProvider ?? throw new ArgumentNullException(nameof(registryCredentialsProvider));
             _tokenCredentialProvider = tokenCredentialProvider ?? throw new ArgumentNullException(nameof(tokenCredentialProvider));
             _imageCacheService = imageCacheService ?? throw new ArgumentNullException(nameof(imageCacheService));
+            _buildAcr = publishConfiguration?.Value?.BuildAcr ?? throw new ArgumentNullException(nameof(publishConfiguration));
 
             // Lazily create services which need access to options
             ArgumentNullException.ThrowIfNull(copyImageServiceFactory);
             _copyImageService = new Lazy<ICopyImageService>(() =>
-                copyImageServiceFactory.Create(Options.AcrServiceConnection));
+                copyImageServiceFactory.Create(_buildAcr?.ServiceConnection));
+
             ArgumentNullException.ThrowIfNull(manifestServiceFactory);
             _manifestService = new Lazy<IManifestService>(() =>
                 manifestServiceFactory.Create(
-                    ownedAcr: Options.RegistryOverride,
-                    Options.AcrServiceConnection,
+                    ownedAcr: _buildAcr?.Server,
+                    _buildAcr?.ServiceConnection,
                     Options.CredentialsOptions));
             _imageDigestCache = new ImageDigestCache(_manifestService);
 
@@ -111,7 +119,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
             if (Options.IsPushEnabled)
             {
                 _ = _tokenCredentialProvider.GetCredential(
-                    Options.AcrServiceConnection,
+                    _buildAcr?.ServiceConnection,
                     AzureScopes.ContainerRegistryScope);
             }
 
@@ -139,8 +147,8 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
                 action: action,
                 credentialsOptions: Options.CredentialsOptions,
                 registryName: Manifest.Registry,
-                ownedAcr: Options.RegistryOverride,
-                serviceConnection: Options.AcrServiceConnection);
+                ownedAcr: _buildAcr?.Server,
+                serviceConnection: _buildAcr?.ServiceConnection);
         }
 
         private async Task ExecuteWithDockerCredentialsAsync(Action action)
@@ -150,8 +158,8 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
                 action: action,
                 credentialsOptions: Options.CredentialsOptions,
                 registryName: Manifest.Registry,
-                ownedAcr: Options.RegistryOverride,
-                serviceConnection: Options.AcrServiceConnection);
+                ownedAcr: _buildAcr?.Server,
+                serviceConnection: _buildAcr?.ServiceConnection);
         }
 
         private void WriteBuiltImagesToOutputVar()

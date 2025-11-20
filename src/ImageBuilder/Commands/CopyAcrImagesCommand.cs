@@ -9,8 +9,10 @@ using System.Linq;
 using System.Threading.Tasks;
 using Azure.Core;
 using Azure.ResourceManager.ContainerRegistry;
+using Microsoft.DotNet.ImageBuilder.Configuration;
 using Microsoft.DotNet.ImageBuilder.Models.Image;
 using Microsoft.DotNet.ImageBuilder.ViewModel;
+using Microsoft.Extensions.Options;
 
 namespace Microsoft.DotNet.ImageBuilder.Commands
 {
@@ -20,8 +22,9 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
 
         public CopyAcrImagesCommand(
             ICopyImageServiceFactory copyImageServiceFactory,
-            ILoggerService loggerService)
-            : base(copyImageServiceFactory, loggerService)
+            ILoggerService loggerService,
+            IOptions<PublishConfiguration> publishConfiguration)
+            : base(copyImageServiceFactory, loggerService, publishConfiguration)
         {
             _imageArtifactDetails = new Lazy<ImageArtifactDetails>(() =>
             {

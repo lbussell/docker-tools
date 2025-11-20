@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using Microsoft.DotNet.ImageBuilder.Configuration;
 using Microsoft.DotNet.ImageBuilder.Models.Manifest;
 using Newtonsoft.Json;
 
@@ -39,14 +40,15 @@ namespace Microsoft.DotNet.ImageBuilder.ViewModel
         {
         }
 
-        public static ManifestInfo Load(IManifestOptionsInfo options)
+        public static ManifestInfo Load(IManifestOptionsInfo options, PublishConfiguration publishConfig = null)
         {
             Logger.WriteHeading("READING MANIFEST");
 
-            ManifestInfo manifest = ManifestInfo.Create(
+            ManifestInfo manifest = Create(
                 options.Manifest,
                 options.GetManifestFilter(),
-                options);
+                options,
+                publishConfig);
 
             if (options.IsVerbose)
             {
@@ -56,7 +58,7 @@ namespace Microsoft.DotNet.ImageBuilder.ViewModel
             return manifest;
         }
 
-        private static ManifestInfo Create(string manifestPath, ManifestFilter manifestFilter, IManifestOptionsInfo options)
+        private static ManifestInfo Create(string manifestPath, ManifestFilter manifestFilter, IManifestOptionsInfo options, PublishConfiguration publishConfig)
         {
             string manifestDirectory = PathHelper.GetNormalizedDirectory(manifestPath);
             Manifest model = LoadModel(manifestPath, manifestDirectory);
@@ -65,7 +67,7 @@ namespace Microsoft.DotNet.ImageBuilder.ViewModel
             ManifestInfo manifestInfo = new ManifestInfo
             {
                 Model = model,
-                Registry = options.RegistryOverride ?? model.Registry,
+                Registry = publishConfig?.BuildAcr?.Server ?? model.Registry,
                 Directory = manifestDirectory
             };
             manifestInfo.VariableHelper = new VariableHelper(model, options, manifestInfo.GetRepoById);
@@ -104,7 +106,7 @@ namespace Microsoft.DotNet.ImageBuilder.ViewModel
         }
 
         public IEnumerable<ImageInfo> GetAllImages() => AllRepos.SelectMany(repo => repo.AllImages);
-        
+
         public ImageInfo GetImageByPlatform(PlatformInfo platform) =>
             GetAllImages()
                 .FirstOrDefault(image => image.AllPlatforms.Contains(platform));

@@ -2,7 +2,9 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using Microsoft.DotNet.ImageBuilder.Configuration;
 using Microsoft.DotNet.ImageBuilder.ViewModel;
+using Microsoft.Extensions.Options;
 
 namespace Microsoft.DotNet.ImageBuilder.Commands
 {
@@ -10,13 +12,22 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
         where TOptions : ManifestOptions, new()
         where TOptionsBuilder : ManifestOptionsBuilder, new()
     {
+        #nullable enable
+        public ManifestCommand(IOptions<PublishConfiguration>? publishConfiguration = null)
+        {
+            PublishConfig = publishConfiguration?.Value;
+        }
+
+        protected PublishConfiguration? PublishConfig { get; }
+        #nullable disable
+
         public ManifestInfo Manifest { get; private set; }
 
         public virtual void LoadManifest()
         {
             if (Manifest is null)
             {
-                Manifest = ManifestInfo.Load(Options);
+                Manifest = ManifestInfo.Load(Options, PublishConfig);
             }
         }
 

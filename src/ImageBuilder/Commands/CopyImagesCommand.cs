@@ -6,6 +6,8 @@ using System;
 using System.Threading.Tasks;
 using Azure.Core;
 using Azure.ResourceManager.ContainerRegistry.Models;
+using Microsoft.DotNet.ImageBuilder.Configuration;
+using Microsoft.Extensions.Options;
 
 #nullable enable
 namespace Microsoft.DotNet.ImageBuilder.Commands;
@@ -18,7 +20,8 @@ public abstract class CopyImagesCommand<TOptions, TOptionsBuilder> : ManifestCom
 
     private ICopyImageService CopyImageService => _copyImageService.Value;
 
-    public CopyImagesCommand(ICopyImageServiceFactory copyImageServiceFactory, ILoggerService loggerService)
+    public CopyImagesCommand(ICopyImageServiceFactory copyImageServiceFactory, ILoggerService loggerService, IOptions<PublishConfiguration>? publishConfiguration = null)
+        : base(publishConfiguration)
     {
         LoggerService = loggerService;
         _copyImageService = new Lazy<ICopyImageService>(() =>

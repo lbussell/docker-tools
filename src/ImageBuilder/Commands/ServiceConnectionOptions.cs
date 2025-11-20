@@ -10,11 +10,12 @@ using static Microsoft.DotNet.ImageBuilder.Commands.CliHelper;
 
 namespace Microsoft.DotNet.ImageBuilder.Commands;
 
-public record ServiceConnectionOptions(
-    string TenantId,
-    string ClientId,
-    string ServiceConnectionId)
-    : IServiceConnection;
+public sealed record ServiceConnectionOptions : IServiceConnection
+{
+    public string TenantId { get; init; } = "";
+    public string ClientId { get; init; } = "";
+    public string ServiceConnectionId { get; init; } = "";
+}
 
 public class ServiceConnectionOptionsBuilder
 {
@@ -40,10 +41,12 @@ public class ServiceConnectionOptionsBuilder
                 var token = result.Tokens.Single();
                 var serviceConnectionInfo = token.Value.Split(':');
 
-                return new ServiceConnectionOptions(
-                    TenantId: serviceConnectionInfo[0],
-                    ClientId: serviceConnectionInfo[1],
-                    ServiceConnectionId: serviceConnectionInfo[2]);
+                return new ServiceConnectionOptions()
+                {
+                    TenantId = serviceConnectionInfo[0],
+                    ClientId = serviceConnectionInfo[1],
+                    ServiceConnectionId = serviceConnectionInfo[2],
+                };
             });
 
         return [option];

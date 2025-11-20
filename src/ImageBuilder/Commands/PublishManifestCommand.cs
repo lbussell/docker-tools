@@ -8,8 +8,10 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.DotNet.ImageBuilder.Configuration;
 using Microsoft.DotNet.ImageBuilder.Models.Image;
 using Microsoft.DotNet.ImageBuilder.ViewModel;
+using Microsoft.Extensions.Options;
 
 #nullable enable
 namespace Microsoft.DotNet.ImageBuilder.Commands
@@ -30,7 +32,8 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
             ILoggerService loggerService,
             IDateTimeService dateTimeService,
             IRegistryCredentialsProvider registryCredentialsProvider,
-            IAzureTokenCredentialProvider tokenCredentialProvider)
+            IAzureTokenCredentialProvider tokenCredentialProvider,
+            IOptions<PublishConfiguration> publishConfiguration) : base(publishConfiguration)
         {
             _dockerService = dockerService ?? throw new ArgumentNullException(nameof(dockerService));
             _loggerService = loggerService ?? throw new ArgumentNullException(nameof(loggerService));
