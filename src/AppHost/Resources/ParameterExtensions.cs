@@ -4,7 +4,7 @@
 
 namespace Microsoft.DotNet.DockerTools.AppHost.Resources;
 
-public static class ParameterResourceBuilderExtensions
+public static class ParameterExtensions
 {
     /// <summary>
     /// Marks a <see cref="ParameterResource"/> as hidden by applying an initial state snapshot
