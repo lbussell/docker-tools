@@ -8,7 +8,6 @@
 .vs
 
 # Visual Studio user-specific files
-**/launchSettings.json
 **/*.user
 
 # ImageBuilder directory
