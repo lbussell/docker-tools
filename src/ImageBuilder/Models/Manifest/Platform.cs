@@ -34,7 +34,7 @@ public class Platform
         "directory. If it is a directory, the file name defaults to Dockerfile."
         )]
     [JsonProperty(Required = Required.Always)]
-    public string Dockerfile { get; set; } = string.Empty;
+    public required string Dockerfile { get; set; } = string.Empty;
 
     [Description(
         "Relative path to the template the Dockerfile is generated from."
@@ -46,20 +46,20 @@ public class Platform
         )]
     [JsonConverter(typeof(StringEnumConverter))]
     [JsonProperty(Required = Required.Always)]
-    public OS OS { get; set; }
+    public required OS OS { get; set; }
 
     [Description(
         "The specific version of the operating system associated with the image. " +
         "Examples: alpine3.9, bionic, nanoserver-1903."
         )]
     [JsonProperty(Required = Required.Always)]
-    public string OsVersion { get; set; } = string.Empty;
+    public required string OsVersion { get; set; } = string.Empty;
 
     [Description(
         "The set of platform-specific tags associated with the image."
         )]
     [JsonProperty(Required = Required.Always)]
-    public IDictionary<string, Tag> Tags { get; set; } = new Dictionary<string, Tag>();
+    public required IDictionary<string, Tag> Tags { get; set; } = new Dictionary<string, Tag>();
 
     [Description(
         "The custom build leg groups associated with the platform."

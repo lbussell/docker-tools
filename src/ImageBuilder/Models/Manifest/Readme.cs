@@ -3,6 +3,7 @@
 // See the LICENSE file in the project root for more information.
 
 using System.ComponentModel;
+using System.Diagnostics.CodeAnalysis;
 using Newtonsoft.Json;
 
 namespace Microsoft.DotNet.ImageBuilder.Models.Manifest;
@@ -16,7 +17,7 @@ public class Readme
             "this repository."
             )]
     [JsonProperty(Required = Required.Always)]
-    public string Path { get; set; } = string.Empty;
+    public required string Path { get; set; } = string.Empty;
 
     [Description(
             "Relative path to the template the readme is generated from."
@@ -27,6 +28,7 @@ public class Readme
     {
     }
 
+    [SetsRequiredMembers]
     public Readme(string path, string? templatePath)
     {
         Path = path;

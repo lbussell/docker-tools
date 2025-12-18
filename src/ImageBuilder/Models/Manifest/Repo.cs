@@ -24,7 +24,7 @@ public class Repo
         "The set of images contained in this repository."
         )]
     [JsonProperty(Required = Required.Always)]
-    public Image[] Images { get; set; }
+    public required Image[] Images { get; set; }
 
     [Description(
         "Relative path to the MCR tags template YAML file that is used by " +
@@ -37,7 +37,7 @@ public class Repo
         "be published (example: dotnet/core/runtime)."
         )]
     [JsonProperty(Required = Required.Always)]
-    public string Name { get; set; }
+    public required string Name { get; set; }
 
     [Description(
         "Info about the readme that documents the repo."

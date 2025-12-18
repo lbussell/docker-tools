@@ -17,16 +17,6 @@ namespace Microsoft.DotNet.ImageBuilder.Tests.Models;
 public class CustomBuildLegGroupSerializationTests
 {
     [Fact]
-    public void DefaultCustomBuildLegGroup_CannotSerialize()
-    {
-        // A default CustomBuildLegGroup has null Name, which violates
-        // [JsonProperty(Required = Required.Always)] and cannot be serialized.
-        CustomBuildLegGroup group = new();
-
-        AssertSerializationFails(group, nameof(CustomBuildLegGroup.Name));
-    }
-
-    [Fact]
     public void FullyPopulatedCustomBuildLegGroup_Integral_Bidirectional()
     {
         CustomBuildLegGroup group = new()

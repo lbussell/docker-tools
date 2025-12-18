@@ -19,7 +19,7 @@ public class ReadmeSerializationTests
     [Fact]
     public void DefaultReadme_Bidirectional()
     {
-        Readme readme = new();
+        Readme readme = new() { Path = "" };
 
         string json = """
             {
@@ -34,7 +34,7 @@ public class ReadmeSerializationTests
     [Fact]
     public void DefaultReadme_RoundTrip()
     {
-        AssertRoundTrip(new Readme(), AssertReadmesEqual);
+        AssertRoundTrip(new Readme() { Path = "" }, AssertReadmesEqual);
     }
 
     [Fact]

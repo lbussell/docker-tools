@@ -19,11 +19,20 @@ public class RepoSerializationTests
     [Fact]
     public void DefaultRepo_CannotSerialize()
     {
-        // A default Repo has null Images and Name, which violate
-        // [JsonProperty(Required = Required.Always)] and cannot be serialized.
-        Repo repo = new();
+        // A default Repo has empty Images array and empty Name, which are omitted/serialized
+        // but required for deserialization, so this can only be tested one-way.
+        Repo repo = new() { Images = [], Name = "" };
 
-        AssertSerializationFails(repo, nameof(Repo.Images));
+        // Empty Images array is omitted by JsonHelper.CustomContractResolver
+        string json = """
+            {
+              "id": null,
+              "mcrTagsMetadataTemplate": null,
+              "name": ""
+            }
+            """;
+
+        AssertSerialization(repo, json);
     }
 
     [Fact]

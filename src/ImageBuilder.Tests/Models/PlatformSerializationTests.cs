@@ -22,7 +22,13 @@ public class PlatformSerializationTests
     {
         // A default Platform can be serialized - it has default values for required properties
         // Architecture defaults to AMD64 and is omitted due to DefaultValueHandling.IgnoreAndPopulate
-        Platform platform = new();
+        Platform platform = new()
+        {
+            Dockerfile = "",
+            OS = OS.Linux,
+            OsVersion = "",
+            Tags = new Dictionary<string, Tag>()
+        };
 
         // Empty BuildArgs dictionary IS serialized (only IList is omitted)
         // Empty Tags dictionary IS serialized

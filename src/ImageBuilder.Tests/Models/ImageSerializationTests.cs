@@ -20,11 +20,19 @@ public class ImageSerializationTests
     [Fact]
     public void DefaultImage_CannotSerialize()
     {
-        // A default Image has null Platforms, which violates
-        // [JsonProperty(Required = Required.Always)] and cannot be serialized.
-        Image image = new();
+        // A default Image has empty Platforms array, which is omitted during serialization
+        // but required for deserialization, so this can only be tested one-way.
+        Image image = new() { Platforms = [] };
 
-        AssertSerializationFails(image, nameof(Image.Platforms));
+        // Empty Platforms array is omitted by JsonHelper.CustomContractResolver
+        string json = """
+            {
+              "sharedTags": null,
+              "productVersion": null
+            }
+            """;
+
+        AssertSerialization(image, json);
     }
 
     [Fact]

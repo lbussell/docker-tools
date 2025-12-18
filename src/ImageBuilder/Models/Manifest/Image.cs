@@ -14,7 +14,7 @@ public class Image
     [Description(
         "The set of platforms that describe the platform-specific variations of the Docker image.")]
     [JsonProperty(Required = Required.Always)]
-    public Platform[] Platforms { get; set; }
+    public required Platform[] Platforms { get; set; }
 
     [Description(
         "The set of tags that are shared amongst all platform-specific versions of the image. An " +

@@ -1,0 +1,63 @@
+{
+  "PublishConfiguration": {
+    "internalMirrorAcr": {
+      "server": "msdotnetcontainersstagingtest.azurecr.io",
+      "repoPrefix": "mirror/",
+      "resourceGroup": "DotnetContainers-Test",
+      "subscription": "941d4baa-5ef2-462e-b4b1-505791294610",
+      "serviceConnection": {
+        "name": "DotnetDockerInternalMirror-Test",
+        "id": "dac5365a-ab28-49bc-84bc-4ea17057f9e6",
+        "clientId": "7ed7492c-9585-4cd1-a5b0-687327091032",
+        "tenantId": "72f988bf-86f1-41af-91ab-2d7cd011db47"
+      }
+    },
+    "publicMirrorAcr": {
+      "server": "msdotnetcontainerscache.azurecr.io",
+      "resourceGroup": "DotnetContainers",
+      "subscription": "f771e792-a1eb-4f91-b6e9-adb6bb09af77",
+      "serviceConnection": {
+        "name": "DotnetDockerPublicMirror-2",
+        "id": "267eeff7-d9d3-4233-a940-48d254b0d30f",
+        "tenantId": "975f013f-7f24-47e8-a7d3-abc4752bf346",
+        "clientId": "2d968a44-f230-4429-997f-dc7c4b27aabb"
+      }
+    },
+    "BuildAcr": {
+      "Server": "msdotnetcontainersstagingtest.azurecr.io",
+      "ResourceGroup": "DotnetContainers-Test",
+      "Subscription": "941d4baa-5ef2-462e-b4b1-505791294610",
+      "RepoPrefix": "build-staging/2852297/",
+      "ServiceConnection": {
+        "Name": "DotnetDockerBuild-Test",
+        "Id": "1a7c9a75-2416-4536-9176-1d4a74d7edbf",
+        "ClientId": "9fc7cbe0-4955-4777-8978-602f945227f8",
+        "TenantId": "72f988bf-86f1-41af-91ab-2d7cd011db47"
+      }
+    },
+    "cleanServiceConnection": {
+      "name": "DotnetDockerClean-Test",
+      "id": "f1e96ea6-e132-4624-b677-130806cb830f",
+      "clientId": "7dec483c-6c6c-4b83-aa7b-a437a84c0e69",
+      "tenantId": "72f988bf-86f1-41af-91ab-2d7cd011db47"
+    },
+    "testServiceConnection": {
+      "name": "DotnetDockerTest-Test",
+      "id": "ff01b40e-4f84-465b-8edc-89b06eafda30",
+      "clientId": "ce3c1b84-b323-4d47-b66b-b87b185c1486",
+      "tenantId": "72f988bf-86f1-41af-91ab-2d7cd011db47"
+    },
+    "publishAcr": {
+      "server": "msdotnetcontainerstest.azurecr.io",
+      "resourceGroup": "DotnetContainers-Test",
+      "subscription": "941d4baa-5ef2-462e-b4b1-505791294610",
+      "repoPrefix": "public/",
+      "serviceConnection": {
+        "name": "DotnetDockerPublish-Test",
+        "id": "300d45c3-c00e-4eca-9097-1160590e612b",
+        "clientId": "8bdaeec4-88dd-42c2-96ba-255ec70c34b0",
+        "tenantId": "72f988bf-86f1-41af-91ab-2d7cd011db47"
+      }
+    }
+  }
+}
