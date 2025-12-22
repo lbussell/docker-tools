@@ -3,15 +3,32 @@
 // See the LICENSE file in the project root for more information.
 
 using ConsoleAppFramework;
+using Microsoft.DotNet.PipelineMonitor.Git;
 
 namespace Microsoft.DotNet.PipelineMonitor.Commands;
 
-internal sealed class MonitorCommand
+internal sealed class RunPipelineCommand
 {
-    [Command("monitor")]
-    public int Execute(string organizationUrl, string projectName, int pipelineId)
+    private readonly IGitCliService _gitCliService;
+
+    public RunPipelineCommand(IGitCliService gitCliService)
     {
-        Console.WriteLine($"Monitoring pipeline {pipelineId} in project {projectName} at {organizationUrl}...");
+        _gitCliService = gitCliService;
+    }
+
+    [Command("run-pipeline")]
+    public async Task<int> Execute(string organizationUrl, string projectName, int pipelineId)
+    {
+        Console.WriteLine($"Starting pipeline {pipelineId} in project {projectName} at {organizationUrl}...");
+
+        // Validate GitCliService.GetRemotesAsync
+        Console.WriteLine("\nTesting GitCliService.GetRemotesAsync()...");
+        var remotes = await _gitCliService.GetRemotesAsync();
+        foreach (var remote in remotes)
+        {
+            Console.WriteLine($"  Remote: {remote.Name} -> {remote.Url} ({remote.Type})");
+        }
+
         return 0;
     }
 }
