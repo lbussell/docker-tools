@@ -29,9 +29,9 @@ namespace Microsoft.DotNet.ImageBuilder.ViewModel
         public string DockerfilePath { get; private set; }
         public string DockerfilePathRelativeToManifest { get; private set; }
         public string? DockerfileTemplate { get; private set; }
-        public string? FinalStageFromImage { get; private set; } = string.Empty;
-        public IEnumerable<string> ExternalFromImages { get; private set; } = Enumerable.Empty<string>();
-        public IEnumerable<string> InternalFromImages { get; private set; } = Enumerable.Empty<string>();
+        public string? FinalStageFromImage { get; private set; } = "";
+        public IEnumerable<string> ExternalFromImages { get; private set; } = [];
+        public IEnumerable<string> InternalFromImages { get; private set; } = [];
         public bool IsWindows => Model.OS == OS.Windows;
         public Platform Model { get; private set; }
         public IEnumerable<string> OverriddenFromImages { get => _overriddenFromImages; }
