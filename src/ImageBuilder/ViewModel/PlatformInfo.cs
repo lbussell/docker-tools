@@ -32,6 +32,7 @@ namespace Microsoft.DotNet.ImageBuilder.ViewModel
         public string? FinalStageFromImage { get; private set; } = "";
         public IEnumerable<string> ExternalFromImages { get; private set; } = [];
         public IEnumerable<string> InternalFromImages { get; private set; } = [];
+        public IEnumerable<string> FromImages { get; private set; } = [];
         public bool IsWindows => Model.OS == OS.Windows;
         public Platform Model { get; private set; }
         public IEnumerable<string> OverriddenFromImages { get => _overriddenFromImages; }
@@ -128,23 +129,24 @@ namespace Microsoft.DotNet.ImageBuilder.ViewModel
                 throw new InvalidOperationException($"Unable to find a FROM image in {DockerfilePath}.");
             }
 
-            IEnumerable<string> fromImages = fromMatches
+            FromImages = fromMatches
                 .Select(match => match.Groups[FromImageMatchName].Value)
                 .Select(from => SubstituteOverriddenRepo(from))
                 .Select(from => SubstituteBuildArgs(from))
                 .Where(from => !IsStageReference(from, fromMatches))
                 .ToArray();
 
-            FinalStageFromImage = fromImages.Last();
+            FinalStageFromImage = FromImages.Last();
             if (IsFromScratchImage(FinalStageFromImage))
             {
                 FinalStageFromImage = null;
             }
 
-            InternalFromImages = fromImages
-                .Where(from => IsInternalFromImage(from))
+            InternalFromImages = FromImages
+                .Where(IsInternalFromImage)
                 .ToArray();
-            ExternalFromImages = fromImages
+
+            ExternalFromImages = FromImages
                 .Except(InternalFromImages)
                 .Where(image => !IsFromScratchImage(image))
                 .ToArray();
