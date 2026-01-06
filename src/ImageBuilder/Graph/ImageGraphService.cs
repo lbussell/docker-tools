@@ -69,14 +69,6 @@ public class GenerateImageGraphCommand : ManifestCommand<GenerateImageGraphOptio
         return platforms.SelectMany(GetPlatformDependencies);
     }
 
-    private void PrintDependencyGraph(IEnumerable<ImageDependency> dependencies)
-    {
-        foreach (var dependency in dependencies)
-        {
-            Console.WriteLine($"{dependency.From.Tag} --> {dependency.To.Tag}");
-        }
-    }
-
     private string GenerateMermaidDiagram(IEnumerable<ImageDependency> dependencies)
     {
         var sb = new StringBuilder();
