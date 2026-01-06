@@ -64,6 +64,7 @@ public static class ImageBuilder
             builder.Services.AddSingleton<ICommand, GenerateDockerfilesCommand>();
             builder.Services.AddSingleton<ICommand, GenerateEolAnnotationDataForAllImagesCommand>();
             builder.Services.AddSingleton<ICommand, GenerateEolAnnotationDataForPublishCommand>();
+            builder.Services.AddSingleton<ICommand, GenerateImageGraphCommand>();
             builder.Services.AddSingleton<ICommand, GenerateReadmesCommand>();
             builder.Services.AddSingleton<ICommand, GenerateSigningPayloadsCommand>();
             builder.Services.AddSingleton<ICommand, GetBaseImageStatusCommand>();
