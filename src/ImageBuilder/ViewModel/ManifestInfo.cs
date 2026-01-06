@@ -104,7 +104,7 @@ namespace Microsoft.DotNet.ImageBuilder.ViewModel
         }
 
         public IEnumerable<ImageInfo> GetAllImages() => AllRepos.SelectMany(repo => repo.AllImages);
-        
+
         public ImageInfo GetImageByPlatform(PlatformInfo platform) =>
             GetAllImages()
                 .FirstOrDefault(image => image.AllPlatforms.Contains(platform));
@@ -156,6 +156,18 @@ namespace Microsoft.DotNet.ImageBuilder.ViewModel
 
             return result;
         }
+
+        #nullable enable
+        public bool TryGetInternalPlatformByTag(string fullTagName, out PlatformInfo? platform)
+        {
+            platform = AllRepos
+                .SelectMany(repo => repo.AllImages)
+                .SelectMany(image => image.AllPlatforms)
+                .FirstOrDefault(platform => platform.Tags.Any(tag => tag.FullyQualifiedName == fullTagName));
+
+            return platform != null;
+        }
+        #nullable restore
 
         public RepoInfo GetRepoById(string id)
         {
