@@ -76,7 +76,7 @@ public class GenerateImageGraphCommand : ManifestCommand<GenerateImageGraphOptio
 
         foreach (var dependency in dependencies)
         {
-            sb.AppendLine($"    {SanitizeForMermaid(dependency.From.Tag)} --> {SanitizeForMermaid(dependency.To.Tag)}");
+            sb.AppendLine($"    {SanitizeForMermaid(dependency.From.Tag)} -->|{dependency.Type.Label}| {SanitizeForMermaid(dependency.To.Tag)}");
         }
 
         return sb.ToString();
@@ -106,7 +106,7 @@ public class GenerateImageGraphCommand : ManifestCommand<GenerateImageGraphOptio
                 .Select(GetPlatformInfoByTag)
                 .Select(SimplePlatformInfo.Create)
                 .Select(dependencyPlatformInfo =>
-                    new ImageDependency(From: thisPlatformInfo, To: dependencyPlatformInfo));
+                    new ImageDependency(From: thisPlatformInfo, To: dependencyPlatformInfo, DependencyType.BaseImage));
 
         // var externalDependencies =
         //     platform.ExternalFromImages
@@ -137,7 +137,12 @@ public class GenerateImageGraphCommand : ManifestCommand<GenerateImageGraphOptio
     }
 }
 
-internal readonly record struct ImageDependency(ISimplePlatformInfo From, ISimplePlatformInfo To);
+internal readonly record struct ImageDependency(ISimplePlatformInfo From, ISimplePlatformInfo To, DependencyType Type);
+
+internal record DependencyType(string Label)
+{
+    public static DependencyType BaseImage = new("has base image");
+}
 
 internal interface ISimplePlatformInfo
 {
