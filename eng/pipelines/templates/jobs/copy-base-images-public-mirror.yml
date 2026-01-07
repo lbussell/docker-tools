@@ -4,10 +4,8 @@ parameters:
   default: null
 - name: subscriptionsPath
   type: string
-  default: null
 - name: publishConfig
   type: object
-  default: null
 - name: customInitSteps
   type: stepList
   default: []
