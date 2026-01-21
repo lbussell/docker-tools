@@ -48,19 +48,16 @@ namespace Microsoft.DotNet.ImageBuilder.Models.Image
                 return 1;
             }
 
-            if (ManifestImage is null || other.ManifestImage is null)
-            {
-                throw new InvalidOperationException($"Can't compare {nameof(ImageData)} objects if {nameof(ManifestImage)} is null.");
-            }
-
-            if (ManifestImage == other.ManifestImage)
+            // If both have ManifestImage set and they're the same reference, they're equal
+            if (ManifestImage is not null && other.ManifestImage is not null && ManifestImage == other.ManifestImage)
             {
                 return 0;
             }
 
-            if (ManifestImage.ProductVersion != other.ProductVersion)
+            // Compare by ProductVersion first
+            if (ProductVersion != other.ProductVersion)
             {
-                return ManifestImage.ProductVersion?.CompareTo(other.ProductVersion) ?? 1;
+                return ProductVersion?.CompareTo(other.ProductVersion) ?? 1;
             }
 
             // If we're comparing two different image items, compare them by the first Platform to
