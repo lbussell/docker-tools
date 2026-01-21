@@ -19,6 +19,7 @@ public interface IImageCacheService
         ImageData? srcImageData,
         PlatformData platformData,
         ImageArtifactContext? context,
+        ImageArtifactContext? srcContext,
         ImageDigestCache imageDigestCache,
         ImageNameResolver imageNameResolver,
         string? sourceRepoUrl,
@@ -56,6 +57,7 @@ public class ImageCacheService : IImageCacheService
         ImageData? srcImageData,
         PlatformData platformData,
         ImageArtifactContext? context,
+        ImageArtifactContext? srcContext,
         ImageDigestCache imageDigestCache,
         ImageNameResolver imageNameResolver,
         string? sourceRepoUrl,
@@ -68,10 +70,11 @@ public class ImageCacheService : IImageCacheService
         // Get PlatformInfo from context if available, otherwise fall back to direct property
         PlatformInfo? platformInfo = context?.GetPlatformInfo(platformData) ?? platformData.PlatformInfo;
 
+        // Find srcPlatformData using the source context
         PlatformData? srcPlatformData = srcImageData?.Platforms
             .FirstOrDefault(srcPlatform =>
             {
-                PlatformInfo? srcPlatformInfo = context?.GetPlatformInfo(srcPlatform) ?? srcPlatform.PlatformInfo;
+                PlatformInfo? srcPlatformInfo = srcContext?.GetPlatformInfo(srcPlatform) ?? srcPlatform.PlatformInfo;
                 return srcPlatformInfo == platformInfo;
             });
 
@@ -87,7 +90,7 @@ public class ImageCacheService : IImageCacheService
             {
                 cacheState = ImageCacheState.Cached;
                 if (srcPlatformData is null ||
-                    !CachedPlatformHasAllTagsPublished(srcPlatformData))
+                    !CachedPlatformHasAllTagsPublished(srcPlatformData, srcContext))
                 {
                     cacheState = ImageCacheState.CachedWithMissingTags;
                 }
@@ -111,7 +114,7 @@ public class ImageCacheService : IImageCacheService
             {
                 isNewCacheHit = true;
                 cacheState = ImageCacheState.Cached;
-                if (!CachedPlatformHasAllTagsPublished(srcPlatformData))
+                if (!CachedPlatformHasAllTagsPublished(srcPlatformData, srcContext))
                 {
                     cacheState = ImageCacheState.CachedWithMissingTags;
                 }
@@ -125,10 +128,13 @@ public class ImageCacheService : IImageCacheService
         return new ImageCacheResult(cacheState, isNewCacheHit, srcPlatformData);
     }
 
-    private static bool CachedPlatformHasAllTagsPublished(PlatformData srcPlatformData) =>
-        (srcPlatformData.PlatformInfo?.Tags ?? [])
+    private static bool CachedPlatformHasAllTagsPublished(PlatformData srcPlatformData, ImageArtifactContext? srcContext)
+    {
+        PlatformInfo? platformInfo = srcContext?.GetPlatformInfo(srcPlatformData) ?? srcPlatformData.PlatformInfo;
+        return (platformInfo?.Tags ?? [])
             .Select(tag => tag.Name)
             .AreEquivalent(srcPlatformData.SimpleTags);
+    }
 
     private async Task<bool> CheckForCachedImageFromImageInfoAsync(
         PlatformInfo platform,

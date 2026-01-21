@@ -315,23 +315,23 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
         {
             _loggerService.WriteHeading("BUILDING IMAGES");
 
-            ImageArtifactDetails? srcImageArtifactDetails = null;
+            ImageArtifactContext? srcContext = null;
             if (Options.ImageInfoSourcePath != null)
             {
-                srcImageArtifactDetails = ImageInfoHelper.LoadFromFile(Options.ImageInfoSourcePath, Manifest, skipManifestValidation: true);
+                srcContext = ImageInfoHelper.LoadFromFileWithContext(Options.ImageInfoSourcePath, Manifest, skipManifestValidation: true);
             }
 
             foreach (RepoInfo repoInfo in Manifest.FilteredRepos)
             {
                 RepoData repoData = CreateRepoData(repoInfo);
-                RepoData? srcRepoData = srcImageArtifactDetails?.Repos.FirstOrDefault(srcRepo => srcRepo.Repo == repoInfo.Name);
+                RepoData? srcRepoData = srcContext?.Details.Repos.FirstOrDefault(srcRepo => srcRepo.Repo == repoInfo.Name);
 
                 foreach (ImageInfo image in repoInfo.FilteredImages)
                 {
                     ImageData imageData = CreateImageData(image);
                     repoData.Images.Add(imageData);
 
-                    ImageData? srcImageData = srcRepoData?.Images.FirstOrDefault(srcImage => srcImage.ManifestImage == image);
+                    ImageData? srcImageData = srcRepoData?.Images.FirstOrDefault(srcImage => srcContext?.GetImageInfo(srcImage) == image);
 
                     foreach (PlatformInfo platform in image.FilteredPlatforms)
                     {
@@ -356,6 +356,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
                                 srcImageData,
                                 platformData,
                                 _imageArtifactContext,
+                                srcContext,
                                 _imageDigestCache,
                                 _imageNameResolver.Value,
                                 sourceRepoUrl: Options.SourceRepoUrl,

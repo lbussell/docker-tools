@@ -19,7 +19,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
     {
         private const string VersionRegGroupName = "Version";
 
-        private readonly Lazy<ImageArtifactDetails?> _imageArtifactDetails;
+        private readonly Lazy<ImageArtifactContext?> _imageArtifactContext;
         private static readonly char[] s_pathSeparators = { '/', '\\' };
         private static readonly Regex s_versionRegex = new(@$"^(?<{VersionRegGroupName}>(\d|\.)+).*$");
         private readonly IImageCacheService _imageCacheService;
@@ -31,11 +31,11 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
         {
             _imageCacheService = imageCacheService ?? throw new ArgumentNullException(nameof(imageCacheService));
             _loggerService = loggerService ?? throw new ArgumentNullException(nameof(loggerService));
-            _imageArtifactDetails = new Lazy<ImageArtifactDetails?>(() =>
+            _imageArtifactContext = new Lazy<ImageArtifactContext?>(() =>
             {
                 if (Options.ImageInfoPath != null)
                 {
-                    return ImageInfoHelper.LoadFromFile(Options.ImageInfoPath, Manifest, skipManifestValidation: true);
+                    return ImageInfoHelper.LoadFromFileWithContext(Options.ImageInfoPath, Manifest, skipManifestValidation: true);
                 }
 
                 return null;
@@ -408,7 +408,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
         {
             IEnumerable<RepoInfo> filteredRepos = Manifest.FilteredRepos.ToList();
 
-            if (_imageArtifactDetails.Value is null)
+            if (_imageArtifactContext.Value is null)
             {
                 return filteredRepos.SelectMany(repo => repo.FilteredImages).SelectMany(image => image.FilteredPlatforms);
             }
@@ -419,7 +419,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
                         .SelectMany(image => image.FilteredPlatforms)
                         .Select(platform =>
                         {
-                            (PlatformData Platform, ImageData Image)? matchingPlatform = ImageInfoHelper.GetMatchingPlatformData(platform, repo, _imageArtifactDetails.Value);
+                            (PlatformData Platform, ImageData Image)? matchingPlatform = ImageInfoHelper.GetMatchingPlatformData(platform, repo, _imageArtifactContext.Value);
                             return (platform, matchingPlatform?.Image, matchingPlatform?.Platform);
                         })
                         .Where(platformMapping => platformMapping.Platform is null || !platformMapping.Platform.IsUnchanged));
@@ -464,6 +464,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
                         platformMapping.ImageData,
                         platformMapping.PlatformData,
                         context: null,
+                        srcContext: _imageArtifactContext.Value,
                         _imageDigestCache,
                         _imageNameResolver.Value,
                         Options.SourceRepoUrl,
