@@ -40,8 +40,8 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
 
             if (!Options.IsDryRun)
             {
-                ImageArtifactDetails imageArtifactDetails = ImageInfoHelper.LoadFromFile(Options.ImageInfoPath, Manifest);
-                IEnumerable<DigestInfo> imageInfos = GetImageDigestInfos(imageArtifactDetails);
+                ImageArtifactContext context = ImageInfoHelper.LoadFromFileWithContext(Options.ImageInfoPath, Manifest);
+                IEnumerable<DigestInfo> imageInfos = GetImageDigestInfos(context);
                 await _imageIngestionReporter.ReportImageStatusesAsync(
                     Options.MarServiceConnection,
                     imageInfos,
@@ -51,11 +51,11 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
             }
         }
 
-        private IEnumerable<DigestInfo> GetImageDigestInfos(ImageArtifactDetails imageArtifactDetails) =>
-            imageArtifactDetails.Repos
-                .SelectMany(repo => repo.Images.SelectMany(image => GetImageDigestInfos(image, repo)));
+        private IEnumerable<DigestInfo> GetImageDigestInfos(ImageArtifactContext context) =>
+            context.Details.Repos
+                .SelectMany(repo => repo.Images.SelectMany(image => GetImageDigestInfos(image, repo, context)));
 
-        private IEnumerable<DigestInfo> GetImageDigestInfos(ImageData image, RepoData repo)
+        private IEnumerable<DigestInfo> GetImageDigestInfos(ImageData image, RepoData repo, ImageArtifactContext context)
         {
             if (image.Manifest?.Digest != null)
             {
@@ -63,7 +63,9 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
                 yield return new DigestInfo(digestSha, Options.RepoPrefix + repo.Repo, image.Manifest.SharedTags);
 
                 // Find all syndicated shared tags grouped by their syndicated repo
-                IEnumerable<IGrouping<string, TagInfo>> syndicatedTagGroups = image.ManifestImage.SharedTags
+                // Use context to get the ImageInfo associated with this ImageData
+                ImageInfo? manifestImage = context.GetImageInfo(image);
+                IEnumerable<IGrouping<string, TagInfo>> syndicatedTagGroups = (manifestImage?.SharedTags ?? Enumerable.Empty<TagInfo>())
                     .Where(tag => image.Manifest.SharedTags.Contains(tag.Name) && tag.SyndicatedRepo != null)
                     .GroupBy(tag => tag.SyndicatedRepo);
 
@@ -94,7 +96,9 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
                 yield return new DigestInfo(sha, Options.RepoPrefix + repo.Repo, platform.SimpleTags);
 
                 // Find all syndicated simple tags grouped by their syndicated repo
-                IEnumerable<IGrouping<string, TagInfo>> syndicatedTagGroups = (platform.PlatformInfo?.Tags ?? Enumerable.Empty<TagInfo>())
+                // Use context to get the PlatformInfo associated with this PlatformData
+                PlatformInfo? platformInfo = context.GetPlatformInfo(platform);
+                IEnumerable<IGrouping<string, TagInfo>> syndicatedTagGroups = (platformInfo?.Tags ?? Enumerable.Empty<TagInfo>())
                     .Where(tagInfo => platform.SimpleTags.Contains(tagInfo.Name) && tagInfo.SyndicatedRepo != null)
                     .GroupBy(tagInfo => tagInfo.SyndicatedRepo);
 
