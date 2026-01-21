@@ -57,7 +57,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
                 return;
             }
 
-            ImageArtifactDetails imageArtifactDetails = ImageInfoHelper.LoadFromFile(Options.ImageInfoPath, Manifest);
+            ImageArtifactContext context = ImageInfoHelper.LoadFromFileWithContext(Options.ImageInfoPath, Manifest);
 
             await _registryCredentialsProvider.ExecuteWithCredentialsAsync(
                 Options.IsDryRun,
@@ -69,7 +69,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
                                 .Where(image => image.SharedTags.Any())
                                 .Where(image => image.AllPlatforms
                                     .Select(platform =>
-                                        ImageInfoHelper.GetMatchingPlatformData(platform, repo, imageArtifactDetails))
+                                        ImageInfoHelper.GetMatchingPlatformData(platform, repo, context))
                                     .Where(platformMapping => platformMapping != null)
                                     .Any(platformMapping => !platformMapping?.Platform.IsUnchanged ?? false))
                                 .Select(image => (repo, image)))
@@ -88,17 +88,17 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
 
                     WriteManifestSummary();
 
-                    await SaveTagInfoToImageInfoFileAsync(createdDate, imageArtifactDetails);
+                    await SaveTagInfoToImageInfoFileAsync(createdDate, context);
                 },
                 Options.CredentialsOptions,
                 registryName: Manifest.Registry);
         }
 
-        private async Task SaveTagInfoToImageInfoFileAsync(DateTime createdDate, ImageArtifactDetails imageArtifactDetails)
+        private async Task SaveTagInfoToImageInfoFileAsync(DateTime createdDate, ImageArtifactContext context)
         {
             _loggerService.WriteSubheading("SETTING TAG INFO");
 
-            IEnumerable<ImageData> images = imageArtifactDetails.Repos
+            IEnumerable<ImageData> images = context.Details.Repos
                 .SelectMany(repo => repo.Images)
                 .Where(image => image.Manifest != null);
 
@@ -106,14 +106,22 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
             {
                 image.Manifest.Created = createdDate;
 
-                TagInfo sharedTag = image.ManifestImage.SharedTags.First();
+                ImageInfo? manifestImage = context.GetImageInfo(image);
+                RepoInfo? manifestRepo = context.GetRepoInfo(image);
+
+                if (manifestImage == null || manifestRepo == null)
+                {
+                    throw new InvalidOperationException($"Unable to find manifest info for image with manifest digest.");
+                }
+
+                TagInfo sharedTag = manifestImage.SharedTags.First();
 
                 image.Manifest.Digest = DockerHelper.GetDigestString(
-                    image.ManifestRepo.FullModelName,
+                    manifestRepo.FullModelName,
                     await _manifestService.Value.GetManifestDigestShaAsync(
                         sharedTag.FullyQualifiedName, Options.IsDryRun));
 
-                IEnumerable<(string Repo, string Tag)> syndicatedRepresentativeSharedTags = image.ManifestImage.SharedTags
+                IEnumerable<(string Repo, string Tag)> syndicatedRepresentativeSharedTags = manifestImage.SharedTags
                     .Where(tag => tag.SyndicatedRepo is not null)
                     .GroupBy(tag => tag.SyndicatedRepo)
                     .Select(group => (group.Key, group.First().SyndicatedDestinationTags.First()))
@@ -132,7 +140,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
                 }
             }
 
-            string imageInfoString = JsonHelper.SerializeObject(imageArtifactDetails);
+            string imageInfoString = JsonHelper.SerializeObject(context.Details);
             File.WriteAllText(Options.ImageInfoPath, imageInfoString);
         }
 

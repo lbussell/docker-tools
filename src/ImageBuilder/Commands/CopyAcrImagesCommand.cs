@@ -17,18 +17,18 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
 {
     public class CopyAcrImagesCommand : CopyImagesCommand<CopyAcrImagesOptions, CopyAcrImagesOptionsBuilder>
     {
-        private readonly Lazy<ImageArtifactDetails> _imageArtifactDetails;
+        private readonly Lazy<ImageArtifactContext> _imageArtifactContext;
 
         public CopyAcrImagesCommand(
             ICopyImageService copyImageService,
             ILoggerService loggerService)
             : base(copyImageService, loggerService)
         {
-            _imageArtifactDetails = new Lazy<ImageArtifactDetails>(() =>
+            _imageArtifactContext = new Lazy<ImageArtifactContext>(() =>
             {
                 if (!string.IsNullOrEmpty(Options.ImageInfoPath))
                 {
-                    return ImageInfoHelper.LoadFromFile(Options.ImageInfoPath, Manifest);
+                    return ImageInfoHelper.LoadFromFileWithContext(Options.ImageInfoPath, Manifest);
                 }
 
                 return null;
@@ -76,23 +76,25 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
             // to handle scenarios where the tag's value is dynamic, such as a timestamp, and we need to know the value
             // of the tag for the image that was actually built rather than just generating new tag values when parsing
             // the manifest.
-            if (_imageArtifactDetails.Value != null)
+            ImageArtifactContext context = _imageArtifactContext.Value;
+            if (context != null)
             {
-                RepoData repoData = _imageArtifactDetails.Value.Repos.FirstOrDefault(repoData => repoData.Repo == repo.Name);
+                RepoData repoData = context.Details.Repos.FirstOrDefault(repoData => repoData.Repo == repo.Name);
                 if (repoData != null)
                 {
                     PlatformData platformData = repoData.Images
                         .SelectMany(image => image.Platforms)
-                        .FirstOrDefault(platformData => platformData.PlatformInfo == platform);
+                        .FirstOrDefault(platformData => context.GetPlatformInfo(platformData) == platform);
                     if (platformData != null)
                     {
+                        PlatformInfo platformInfo = context.GetPlatformInfo(platformData);
                         foreach (string tag in platformData.SimpleTags)
                         {
                             string destinationTag = TagInfo.GetFullyQualifiedName(repo.QualifiedName, tag);
                             string sourceTag = GetSourceTag(destinationTag);
                             tags.Add((sourceTag, destinationTag));
 
-                            TagInfo tagInfo = platformData.PlatformInfo.Tags.FirstOrDefault(tagInfo => tagInfo.Name == tag);
+                            TagInfo tagInfo = platformInfo?.Tags.FirstOrDefault(tagInfo => tagInfo.Name == tag);
                             // There may not be a matching tag due to dynamic tag names. For now, we'll say that
                             // syndication is not supported for dynamically named tags.
                             // See https://github.com/dotnet/docker-tools/issues/686

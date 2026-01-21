@@ -300,6 +300,33 @@ namespace Microsoft.DotNet.ImageBuilder
             return null;
         }
 
+        /// <summary>
+        /// Finds the <see cref="PlatformData"/> that matches the given <see cref="PlatformInfo"/> using a context for lookups.
+        /// </summary>
+        /// <param name="platform">Platform being searched.</param>
+        /// <param name="repo">Repo that corresponds to the platform.</param>
+        /// <param name="context">Image artifact context containing lookup dictionaries.</param>
+        public static (PlatformData Platform, ImageData Image)? GetMatchingPlatformData(PlatformInfo platform, RepoInfo repo, ImageArtifactContext context)
+        {
+            RepoData repoData = context.Details.Repos.FirstOrDefault(s => s.Repo == repo.Name);
+            if (repoData == null || repoData.Images == null)
+            {
+                return null;
+            }
+
+            foreach (ImageData imageData in repoData.Images)
+            {
+                PlatformData platformData = imageData.Platforms
+                    .FirstOrDefault(platformData => context.GetPlatformInfo(platformData) == platform);
+                if (platformData != null)
+                {
+                    return (platformData, imageData);
+                }
+            }
+
+            return null;
+        }
+
         public static void MergeImageArtifactDetails(ImageArtifactDetails src, ImageArtifactDetails target, ImageInfoMergeOptions options = null)
         {
             if (options == null)

@@ -25,6 +25,8 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
                 "*.json",
                 SearchOption.AllDirectories);
 
+            // Note: MergeImageArtifactDetails uses CompareTo which requires ManifestImage to be set,
+            // so we use LoadFromFile which populates those properties.
             List<(string Path, ImageArtifactDetails ImageArtifactDetails)> srcImageArtifactDetailsList = imageInfoFiles
                 .OrderBy(file => file) // Ensure the files are ordered for testing consistency between OS's.
                 .Select(imageDataPath =>

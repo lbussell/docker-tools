@@ -37,17 +37,21 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
             {
                 // We want to apply manifest filtering to the loading of the image info file. This allows, for example,
                 // only images of a specific architecture to be pulled.
-                ImageArtifactDetails imageArtifactDetails = ImageInfoHelper.LoadFromFile(
+                ImageArtifactContext context = ImageInfoHelper.LoadFromFileWithContext(
                     Options.ImageInfoPath, Manifest, skipManifestValidation: true, useFilteredManifest: true);
-                platformTags = imageArtifactDetails.Repos
+                platformTags = context.Details.Repos
                     .SelectMany(repo => repo.Images)
                     .SelectMany(image => image.Platforms)
                     // If the platform doesn't have an associated manifest instance, it means the manifest filter
                     // options had filtered out the platform. In that case, it doesn't apply and shouldn't be pulled.
-                    .Where(platform => platform.PlatformInfo is not null && platform.SimpleTags.Any())
-                    .Select(platform => (
-                        TagInfo.GetFullyQualifiedName(platform.PlatformInfo!.FullRepoModelName, platform.SimpleTags.First()),
-                        platform.PlatformInfo!.PlatformLabel));
+                    .Where(platform => context.GetPlatformInfo(platform) is not null && platform.SimpleTags.Any())
+                    .Select(platform =>
+                    {
+                        PlatformInfo platformInfo = context.GetPlatformInfo(platform)!;
+                        return (
+                            TagInfo.GetFullyQualifiedName(platformInfo.FullRepoModelName, platform.SimpleTags.First()),
+                            platformInfo.PlatformLabel);
+                    });
             }
 
             platformTags = platformTags

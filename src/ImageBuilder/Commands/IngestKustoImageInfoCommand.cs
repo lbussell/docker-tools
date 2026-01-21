@@ -55,17 +55,21 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
             StringBuilder imageInfo = new();
             StringBuilder layerInfo = new();
 
-            foreach (RepoData repo in ImageInfoHelper.LoadFromFile(Options.ImageInfoPath, Manifest).Repos)
+            ImageArtifactContext context = ImageInfoHelper.LoadFromFileWithContext(Options.ImageInfoPath, Manifest);
+
+            foreach (RepoData repo in context.Details.Repos)
             {
                 foreach (ImageData image in repo.Images)
                 {
                     foreach (PlatformData platform in image.Platforms)
                     {
+                        PlatformInfo? platformInfo = context.GetPlatformInfo(platform);
+
                         string timestamp = platform.Created.ToUniversalTime().ToString("yyyy'-'MM'-'dd' 'HH':'mm':'ss");
                         string sha = DockerHelper.GetDigestSha(platform.Digest);
-                        imageInfo.AppendLine(FormatImageCsv(sha, platform, image, repo.Repo, timestamp));
+                        imageInfo.AppendLine(FormatImageCsv(sha, platform, platformInfo, image, repo.Repo, timestamp));
 
-                        IEnumerable<TagInfo> tagInfos = (platform.PlatformInfo?.Tags ?? Enumerable.Empty<TagInfo>())
+                        IEnumerable<TagInfo> tagInfos = (platformInfo?.Tags ?? Enumerable.Empty<TagInfo>())
                             .Where(tagInfo => platform.SimpleTags.Contains(tagInfo.Name))
                             .ToList();
 
@@ -77,19 +81,19 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
                         foreach (string syndicatedRepo in syndicatedRepos)
                         {
                             imageInfo.AppendLine(
-                                FormatImageCsv(sha, platform, image, syndicatedRepo, timestamp));
+                                FormatImageCsv(sha, platform, platformInfo, image, syndicatedRepo, timestamp));
                         }
 
                         foreach (TagInfo tag in tagInfos)
                         {
-                            imageInfo.AppendLine(FormatImageCsv(tag.Name, platform, image, repo.Repo, timestamp));
+                            imageInfo.AppendLine(FormatImageCsv(tag.Name, platform, platformInfo, image, repo.Repo, timestamp));
 
                             if (tag.SyndicatedRepo != null)
                             {
                                 foreach (string destinationTag in tag.SyndicatedDestinationTags)
                                 {
                                     imageInfo.AppendLine(
-                                       FormatImageCsv(destinationTag, platform, image, tag.SyndicatedRepo, timestamp));
+                                       FormatImageCsv(destinationTag, platform, platformInfo, image, tag.SyndicatedRepo, timestamp));
                                 }
                             }
                         }
@@ -97,7 +101,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
                         for (int i = 0; i < platform.Layers.Count; i++)
                         {
                             layerInfo.AppendLine(FormatLayerCsv(
-                                platform.Layers[i].Digest, platform.Layers[i].Size, platform.Layers.Count - i, sha, platform, image, repo.Repo, timestamp));
+                                platform.Layers[i].Digest, platform.Layers[i].Size, platform.Layers.Count - i, sha, platform, platformInfo, image, repo.Repo, timestamp));
                         }
                     }
                 }
@@ -107,8 +111,8 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
             return (imageInfo.ToString().TrimEndString(Environment.NewLine), layerInfo.ToString().TrimEndString(Environment.NewLine));
         }
 
-        private static string FormatImageCsv(string imageId, PlatformData platform, ImageData image, string repo, string timestamp) =>
-            $"\"{imageId}\",\"{platform.Architecture}\",\"{platform.OsType}\",\"{platform.PlatformInfo?.GetOSDisplayName()}\","
+        private static string FormatImageCsv(string imageId, PlatformData platform, PlatformInfo? platformInfo, ImageData image, string repo, string timestamp) =>
+            $"\"{imageId}\",\"{platform.Architecture}\",\"{platform.OsType}\",\"{platformInfo?.GetOSDisplayName()}\","
                 + $"\"{image.ProductVersion}\",\"{platform.Dockerfile}\",\"{repo}\",\"{timestamp}\"";
 
         private static string FormatLayerCsv(
@@ -117,10 +121,11 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
             int ordinal,
             string imageDigest,
             PlatformData platform,
+            PlatformInfo? platformInfo,
             ImageData image,
             string repo,
             string timestamp) =>
-                $"\"{layerDigest}\",\"{size}\",\"{ordinal}\",{FormatImageCsv(imageDigest, platform, image, repo, timestamp)}";
+                $"\"{layerDigest}\",\"{size}\",\"{ordinal}\",{FormatImageCsv(imageDigest, platform, platformInfo, image, repo, timestamp)}";
 
         private async Task IngestInfoAsync(string info, string table)
         {
