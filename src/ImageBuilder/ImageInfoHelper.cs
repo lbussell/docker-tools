@@ -211,52 +211,53 @@ namespace Microsoft.DotNet.ImageBuilder
         public static ImageArtifactDetails LoadFromContent(string imageInfoContent, ManifestInfo manifest,
             bool skipManifestValidation = false, bool useFilteredManifest = false)
         {
-            ImageArtifactDetails imageArtifactDetails = ImageArtifactDetails.FromJson(imageInfoContent);
+            // Use context-based loading internally
+            ImageArtifactContext context = LoadFromContentWithContext(imageInfoContent, manifest, skipManifestValidation, useFilteredManifest);
 
-            foreach (RepoData repoData in imageArtifactDetails.Repos)
+            // Populate model properties from context for backward compatibility
+            PopulateModelPropertiesFromContext(context);
+
+            return context.Details;
+        }
+
+        /// <summary>
+        /// Populates the [JsonIgnore] ViewModel properties on model objects from the context.
+        /// This is for backward compatibility during the migration to context-based lookups.
+        /// </summary>
+        private static void PopulateModelPropertiesFromContext(ImageArtifactContext context)
+        {
+            foreach (RepoData repoData in context.Details.Repos)
             {
-                RepoInfo manifestRepo = (useFilteredManifest ? manifest.FilteredRepos : manifest.AllRepos)
-                    .FirstOrDefault(repo => repo.Name == repoData.Repo);
-                if (manifestRepo == null)
-                {
-                    Console.WriteLine($"Image info repo not loaded: {repoData.Repo}");
-                    continue;
-                }
-
                 foreach (ImageData imageData in repoData.Images)
                 {
-                    imageData.ManifestRepo = manifestRepo;
+                    ImageInfo imageInfo = context.GetImageInfo(imageData);
+                    RepoInfo repoInfo = context.GetRepoInfo(imageData);
+
+                    if (imageInfo != null)
+                    {
+                        imageData.ManifestImage = imageInfo;
+                    }
+                    if (repoInfo != null)
+                    {
+                        imageData.ManifestRepo = repoInfo;
+                    }
 
                     foreach (PlatformData platformData in imageData.Platforms)
                     {
-                        foreach (ImageInfo manifestImage in useFilteredManifest ? manifestRepo.FilteredImages : manifestRepo.AllImages)
+                        PlatformInfo platformInfo = context.GetPlatformInfo(platformData);
+                        ImageInfo platformImageInfo = context.GetImageInfoForPlatform(platformData);
+
+                        if (platformInfo != null)
                         {
-                            PlatformInfo matchingManifestPlatform = (useFilteredManifest ? manifestImage.FilteredPlatforms : manifestImage.AllPlatforms)
-                                .FirstOrDefault(platform => ArePlatformsEqual(platformData, imageData, platform, manifestImage));
-                            if (matchingManifestPlatform != null)
-                            {
-                                if (imageData.ManifestImage is null)
-                                {
-                                    imageData.ManifestImage = manifestImage;
-                                }
-
-                                platformData.PlatformInfo = matchingManifestPlatform;
-                                platformData.ImageInfo = manifestImage;
-                                break;
-                            }
+                            platformData.PlatformInfo = platformInfo;
                         }
-                    }
-
-                    PlatformData representativePlatform = imageData.Platforms.FirstOrDefault();
-                    if (!skipManifestValidation && imageData.ManifestImage == null && representativePlatform != null)
-                    {
-                        throw new InvalidOperationException(
-                            $"Unable to find matching platform in manifest for platform '{representativePlatform.GetIdentifier()}'.");
+                        if (platformImageInfo != null)
+                        {
+                            platformData.ImageInfo = platformImageInfo;
+                        }
                     }
                 }
             }
-
-            return imageArtifactDetails;
         }
 
         /// <summary>
