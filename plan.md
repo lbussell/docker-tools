@@ -109,11 +109,24 @@ Created `ImageArtifactContext` class that provides:
 
 ---
 
-### Task 2: Migrate Image Models to ImageBuilder.Models (IN PROGRESS)
+### Task 2: Migrate Image Models to ImageBuilder.Models (BLOCKED)
 
 **Description**: Move the `Models/Image/` classes from ImageBuilder to ImageBuilder.Models.
 
-**Status**: BLOCKED - Need to complete Task 2a and 2b first.
+**Status**: BLOCKED - ViewModel dependencies cannot be resolved without architectural changes.
+
+**Blocker Details**: 
+The Image models have `[JsonIgnore]` properties that reference ViewModel types (ImageInfo, PlatformInfo, RepoInfo, TagInfo). These ViewModel types are in ImageBuilder, so moving the models to ImageBuilder.Models would create a circular dependency (ImageBuilder.Models -> ImageBuilder -> ImageBuilder.Models).
+
+**Options to Resolve**:
+1. **Extract ViewModels** - Move ViewModel types to a separate project that both ImageBuilder and ImageBuilder.Models can reference
+2. **Keep models in ImageBuilder** - Skip migration of Image models and only migrate Manifest models (which don't have ViewModel dependencies)
+3. **Context-only approach** - Remove `[JsonIgnore]` properties from models, requiring ALL code to use ImageArtifactContext
+
+**Recommendation**: Option 3 is preferred long-term, but requires completing migration of remaining commands:
+- MergeImageInfoCommand (uses `ManifestImage` for matching)
+- ImageInfoHelper.LoadFromFile (sets all ViewModel properties)
+- GenerateBuildMatrixCommand (uses `PlatformInfo`)
 
 **Files to migrate** (after ViewModel decoupling):
 - `ImageArtifactDetails.cs`
@@ -132,11 +145,15 @@ Created `ImageArtifactContext` class that provides:
 
 ---
 
-### Task 2a: Migrate BuildCommand to use ImageArtifactContext (NEW)
+### Task 2a: Migrate BuildCommand to use ImageArtifactContext ✅ COMPLETE
 
 **Description**: Refactor `BuildCommand` to use the context pattern when creating and tracking `PlatformData` objects during builds.
 
-**Current Issue**: `BuildCommand` creates new `PlatformData` objects via `PlatformData.FromPlatformInfo()` and sets `ImageInfo`/`PlatformInfo` properties directly.
+**Implementation**:
+- Added `_imageArtifactContext` field alongside `_imageArtifactDetails` in BuildCommand
+- `CreatePlatformData()` now registers platforms in context via `SetPlatformContext`
+- Added `GetPlatformInfo()` and `GetImageInfo()` helper methods for context lookups with fallback
+- All usages of `platformData.PlatformInfo` updated to use helper methods
 
 **Approach**:
 - Create a context alongside `_imageArtifactDetails` in BuildCommand
@@ -151,38 +168,36 @@ Created `ImageArtifactContext` class that provides:
 
 ---
 
-### Task 2b: Migrate ImageCacheService to use ImageArtifactContext (NEW)
+### Task 2b: Migrate ImageCacheService to use ImageArtifactContext ✅ COMPLETE
 
 **Description**: Refactor `ImageCacheService` to receive context instead of relying on `PlatformData.PlatformInfo`.
 
-**Current Issue**: `CheckForCachedImageAsync` uses `platformData.PlatformInfo` for cache key generation.
-
-**Approach**:
-- Add `ImageArtifactContext` parameter to `CheckForCachedImageAsync`
-- Update cache key generation to use `context.GetPlatformInfo(platformData)`
-- Update callers (BuildCommand) to pass context
+**Implementation**:
+- Added `ImageArtifactContext?` parameter to `CheckForCachedImageAsync` interface and implementation
+- Uses context for PlatformInfo lookups with fallback to direct property
+- Updated BuildCommand to pass `_imageArtifactContext` to CheckForCachedImageAsync
+- Updated GenerateBuildMatrixCommand to pass `context: null`
+- Updated test mocks
 
 **Acceptance Criteria**:
-- [ ] ImageCacheService uses context for PlatformInfo lookups
-- [ ] All cache-related tests pass
+- [x] ImageCacheService uses context for PlatformInfo lookups
+- [x] All cache-related tests pass
 
 ---
 
-### Task 2c: Update ImageData.CompareTo to not require ManifestImage (NEW)
+### Task 2c: Update ImageData.CompareTo to not require ManifestImage ✅ COMPLETE
 
 **Description**: The `CompareTo` method throws if `ManifestImage` is null. This blocks merge operations with context-based loading.
 
-**Current Issue**: `MergeImageArtifactDetails` uses `ImageData.CompareTo` which requires `ManifestImage`.
-
-**Approach Options**:
-1. Change comparison to use serializable properties only (ProductVersion + first Platform)
-2. Keep ManifestImage property but make comparison null-safe
-3. Create separate comparer class for merge operations
+**Implementation**:
+- Removed `InvalidOperationException` when ManifestImage is null
+- Made comparison null-safe: checks if both have same ManifestImage reference before comparing
+- Falls back to ProductVersion and first Platform comparison when ManifestImage is not set
 
 **Acceptance Criteria**:
-- [ ] `ImageData.CompareTo` works without ManifestImage
-- [ ] Merge operations continue to work correctly
-- [ ] All merge-related tests pass
+- [x] `ImageData.CompareTo` works without ManifestImage
+- [x] Merge operations continue to work correctly
+- [x] All merge-related tests pass
 
 ---
 
