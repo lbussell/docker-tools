@@ -463,6 +463,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
                     ImageCacheResult cacheResult = await _imageCacheService.CheckForCachedImageAsync(
                         platformMapping.ImageData,
                         platformMapping.PlatformData,
+                        context: null,
                         _imageDigestCache,
                         _imageNameResolver.Value,
                         Options.SourceRepoUrl,

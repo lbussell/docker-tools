@@ -43,6 +43,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
         private readonly Dictionary<string, string> _sourceDigestCopyLocationMapping = new();
 
         private ImageArtifactDetails? _imageArtifactDetails;
+        private ImageArtifactContext? _imageArtifactContext;
 
         public BuildCommand(
             IDockerService dockerService,
@@ -104,6 +105,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
             if (Options.ImageInfoOutputPath != null)
             {
                 _imageArtifactDetails = new ImageArtifactDetails();
+                _imageArtifactContext = new ImageArtifactContext(_imageArtifactDetails);
             }
 
             await ExecuteWithDockerCredentialsAsync(PullBaseImagesAsync);
@@ -146,7 +148,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
             if (!string.IsNullOrEmpty(Options.OutputVariableName))
             {
                 IEnumerable<string> builtDigests = _builtPlatforms
-                    .Select(platform => DockerHelper.GetDigestString(platform.PlatformInfo!.RepoName, DockerHelper.GetDigestSha(platform.Digest)))
+                    .Select(platform => DockerHelper.GetDigestString(GetPlatformInfo(platform)!.RepoName, DockerHelper.GetDigestSha(platform.Digest)))
                     .Distinct();
                 _loggerService.WriteMessage(
                     PipelineHelper.FormatOutputVariable(
@@ -170,9 +172,10 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
             Dictionary<string, PlatformData> platformDataByTag = new Dictionary<string, PlatformData>();
             foreach (PlatformData platformData in GetProcessedPlatforms())
             {
-                if (platformData.PlatformInfo is not null)
+                PlatformInfo? platformInfo = GetPlatformInfo(platformData);
+                if (platformInfo is not null)
                 {
-                    foreach (TagInfo tag in platformData.PlatformInfo.Tags)
+                    foreach (TagInfo tag in platformInfo.Tags)
                     {
                         platformDataByTag.Add(tag.FullyQualifiedName, platformData);
                     }
@@ -184,7 +187,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
 
             foreach (PlatformData platform in processedPlatforms)
             {
-                IEnumerable<TagInfo> pushTags = platform.PlatformInfo?.Tags ?? [];
+                IEnumerable<TagInfo> pushTags = GetPlatformInfo(platform)?.Tags ?? [];
 
                 foreach (TagInfo tag in pushTags)
                 {
@@ -203,7 +206,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
                     platformsWithNoPushTags.Add(platform);
                 }
 
-                platform.CommitUrl = _gitService.GetDockerfileCommitUrl(platform.PlatformInfo, Options.SourceRepoUrl);
+                platform.CommitUrl = _gitService.GetDockerfileCommitUrl(GetPlatformInfo(platform), Options.SourceRepoUrl);
             }
 
             // Some platforms do not have concrete tags. In such cases, they must be duplicates of a platform in a different
@@ -213,12 +216,12 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
             foreach (PlatformData platform in platformsWithNoPushTags)
             {
                 PlatformData matchingBuiltPlatform = processedPlatforms.First(builtPlatform =>
-                    (builtPlatform.PlatformInfo?.Tags ?? []).Any() &&
-                    platform.ImageInfo is not null &&
-                    platform.PlatformInfo is not null &&
-                    builtPlatform.ImageInfo is not null &&
-                    builtPlatform.PlatformInfo is not null &&
-                    PlatformInfo.AreMatchingPlatforms(platform.ImageInfo, platform.PlatformInfo, builtPlatform.ImageInfo, builtPlatform.PlatformInfo));
+                    (GetPlatformInfo(builtPlatform)?.Tags ?? []).Any() &&
+                    GetImageInfo(platform) is not null &&
+                    GetPlatformInfo(platform) is not null &&
+                    GetImageInfo(builtPlatform) is not null &&
+                    GetPlatformInfo(builtPlatform) is not null &&
+                    PlatformInfo.AreMatchingPlatforms(GetImageInfo(platform)!, GetPlatformInfo(platform)!, GetImageInfo(builtPlatform)!, GetPlatformInfo(builtPlatform)!));
 
                 platform.Digest = matchingBuiltPlatform.Digest;
                 platform.Created = matchingBuiltPlatform.Created;
@@ -244,12 +247,13 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
         private void SetPlatformDataBaseDigest(PlatformData platform, Dictionary<string, PlatformData> platformDataByTag)
         {
             string? baseImageDigest = platform.BaseImageDigest;
-            if (platform.BaseImageDigest is null && platform.PlatformInfo?.FinalStageFromImage is not null)
+            PlatformInfo? platformInfo = GetPlatformInfo(platform);
+            if (platform.BaseImageDigest is null && platformInfo?.FinalStageFromImage is not null)
             {
-                if (!platformDataByTag.TryGetValue(platform.PlatformInfo.FinalStageFromImage, out PlatformData? basePlatformData))
+                if (!platformDataByTag.TryGetValue(platformInfo.FinalStageFromImage, out PlatformData? basePlatformData))
                 {
                     throw new InvalidOperationException(
-                        $"Unable to find platform data for tag '{platform.PlatformInfo.FinalStageFromImage}'. " +
+                        $"Unable to find platform data for tag '{platformInfo.FinalStageFromImage}'. " +
                         "It's likely that the platforms are not ordered according to dependency.");
                 }
 
@@ -261,10 +265,10 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
                 baseImageDigest = basePlatformData.Digest;
             }
 
-            if (platform.PlatformInfo?.FinalStageFromImage is not null && baseImageDigest is not null)
+            if (platformInfo?.FinalStageFromImage is not null && baseImageDigest is not null)
             {
                 baseImageDigest = DockerHelper.GetDigestString(
-                    DockerHelper.GetRepo(_imageNameResolver.Value.GetFromImagePublicTag(platform.PlatformInfo.FinalStageFromImage)),
+                    DockerHelper.GetRepo(_imageNameResolver.Value.GetFromImagePublicTag(platformInfo.FinalStageFromImage)),
                     DockerHelper.GetDigestSha(baseImageDigest));
             }
 
@@ -283,9 +287,10 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
         {
             // The digest of an image that is pushed to ACR is guaranteed to be the same when transferred to MCR.
             string? digest = await _imageDigestCache.GetLocalImageDigestAsync(tag, Options.IsDryRun);
-            if (digest is not null && platform.PlatformInfo is not null)
+            PlatformInfo? platformInfo = GetPlatformInfo(platform);
+            if (digest is not null && platformInfo is not null)
             {
-                digest = DockerHelper.GetDigestString(platform.PlatformInfo.FullRepoModelName, DockerHelper.GetDigestSha(digest));
+                digest = DockerHelper.GetDigestString(platformInfo.FullRepoModelName, DockerHelper.GetDigestSha(digest));
             }
 
             if (!string.IsNullOrEmpty(platform.Digest) && platform.Digest != digest)
@@ -350,6 +355,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
                             ImageCacheResult cacheResult = await _imageCacheService.CheckForCachedImageAsync(
                                 srcImageData,
                                 platformData,
+                                _imageArtifactContext,
                                 _imageDigestCache,
                                 _imageNameResolver.Value,
                                 sourceRepoUrl: Options.SourceRepoUrl,
@@ -412,6 +418,9 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
                 .Select(tag => tag.Name)
                 .OrderBy(name => name)
                 .ToList();
+
+            // Register the platform in the context for ViewModel lookups
+            _imageArtifactContext?.SetPlatformContext(platformData, platform, image);
 
             return platformData;
         }
@@ -778,5 +787,17 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
 
             _loggerService.WriteMessage();
         }
+
+        /// <summary>
+        /// Gets PlatformInfo for a PlatformData, using context if available, otherwise falling back to direct property.
+        /// </summary>
+        private PlatformInfo? GetPlatformInfo(PlatformData platformData) =>
+            _imageArtifactContext?.GetPlatformInfo(platformData) ?? platformData.PlatformInfo;
+
+        /// <summary>
+        /// Gets ImageInfo for a PlatformData, using context if available, otherwise falling back to direct property.
+        /// </summary>
+        private ImageInfo? GetImageInfo(PlatformData platformData) =>
+            _imageArtifactContext?.GetImageInfoForPlatform(platformData) ?? platformData.ImageInfo;
     }
 }

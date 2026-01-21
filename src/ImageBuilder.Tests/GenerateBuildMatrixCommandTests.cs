@@ -161,6 +161,7 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
                 .Setup(o => o.CheckForCachedImageAsync(
                     It.IsAny<ImageData>(),
                     It.Is<PlatformData>(platform => platform.Dockerfile == dockerfilePath),
+                    It.IsAny<ImageArtifactContext>(),
                     It.IsAny<ImageDigestCache>(),
                     It.IsAny<ImageNameResolver>(),
                     It.IsAny<string>(),

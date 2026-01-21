@@ -18,6 +18,7 @@ public interface IImageCacheService
     Task<ImageCacheResult> CheckForCachedImageAsync(
         ImageData? srcImageData,
         PlatformData platformData,
+        ImageArtifactContext? context,
         ImageDigestCache imageDigestCache,
         ImageNameResolver imageNameResolver,
         string? sourceRepoUrl,
@@ -54,6 +55,7 @@ public class ImageCacheService : IImageCacheService
     public async Task<ImageCacheResult> CheckForCachedImageAsync(
         ImageData? srcImageData,
         PlatformData platformData,
+        ImageArtifactContext? context,
         ImageDigestCache imageDigestCache,
         ImageNameResolver imageNameResolver,
         string? sourceRepoUrl,
@@ -62,15 +64,23 @@ public class ImageCacheService : IImageCacheService
     {
         ImageCacheState cacheState = ImageCacheState.NotCached;
         bool isNewCacheHit = false;
-        PlatformData? srcPlatformData = srcImageData?.Platforms
-            .FirstOrDefault(srcPlatform => srcPlatform.PlatformInfo == platformData.PlatformInfo);
 
-        if (platformData.PlatformInfo is null)
+        // Get PlatformInfo from context if available, otherwise fall back to direct property
+        PlatformInfo? platformInfo = context?.GetPlatformInfo(platformData) ?? platformData.PlatformInfo;
+
+        PlatformData? srcPlatformData = srcImageData?.Platforms
+            .FirstOrDefault(srcPlatform =>
+            {
+                PlatformInfo? srcPlatformInfo = context?.GetPlatformInfo(srcPlatform) ?? srcPlatform.PlatformInfo;
+                return srcPlatformInfo == platformInfo;
+            });
+
+        if (platformInfo is null)
         {
             throw new Exception("Expected platform info to be set");
         }
 
-        string cacheKey = GetBuildCacheKey(platformData.PlatformInfo);
+        string cacheKey = GetBuildCacheKey(platformInfo);
         lock (_cachedPlatformsLock)
         {
             if (_cachedPlatforms.TryGetValue(cacheKey, out PlatformData? cachedPlatform))
@@ -89,7 +99,7 @@ public class ImageCacheService : IImageCacheService
         if (srcPlatformData != null)
         {
             bool isCachedImage = await CheckForCachedImageFromImageInfoAsync(
-                platformData.PlatformInfo,
+                platformInfo,
                 srcPlatformData,
                 imageDigestCache,
                 imageNameResolver,
