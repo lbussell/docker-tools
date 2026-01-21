@@ -1127,7 +1127,7 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
 
             // Verify the merged result
             string resultContent = File.ReadAllText(outputImageInfoFile);
-            ImageArtifactDetails mergedImageInfo = ImageArtifactDetails.FromJson(resultContent);
+            ImageArtifactDetails mergedImageInfo = ImageArtifactDetailsHelper.FromJson(resultContent);
 
             mergedImageInfo.Repos.ShouldHaveSingleItem();
             mergedImageInfo.Repos[0].Images.ShouldHaveSingleItem();

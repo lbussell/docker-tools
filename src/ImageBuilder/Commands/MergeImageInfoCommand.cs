@@ -25,18 +25,17 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
                 "*.json",
                 SearchOption.AllDirectories);
 
-            // Note: MergeImageArtifactDetails uses CompareTo which requires ManifestImage to be set,
-            // so we use LoadFromFile which populates those properties.
-            List<(string Path, ImageArtifactDetails ImageArtifactDetails)> srcImageArtifactDetailsList = imageInfoFiles
+            // Load image info files with context for ViewModel lookups
+            List<(string Path, ImageArtifactContext Context)> srcContextList = imageInfoFiles
                 .OrderBy(file => file) // Ensure the files are ordered for testing consistency between OS's.
                 .Select(imageDataPath =>
-                    (imageDataPath, ImageInfoHelper.LoadFromFile(
+                    (imageDataPath, ImageInfoHelper.LoadFromFileWithContext(
                                         imageDataPath,
                                         Manifest,
                                         skipManifestValidation: Options.IsPublishScenario)))
                 .ToList();
 
-            if (!srcImageArtifactDetailsList.Any())
+            if (!srcContextList.Any())
             {
                 throw new InvalidOperationException(
                     $"No JSON files found in source folder '{Options.SourceImageInfoFolderPath}'");
@@ -48,18 +47,18 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
             };
 
             // Keep track of initial state to identify updated images
-            ImageArtifactDetails? initialImageArtifactDetails = null;
+            ImageArtifactContext? initialContext = null;
 
-            ImageArtifactDetails targetImageArtifactDetails;
+            ImageArtifactContext targetContext;
             if (Options.InitialImageInfoPath != null)
             {
-                targetImageArtifactDetails = srcImageArtifactDetailsList.First(item => item.Path == Options.InitialImageInfoPath).ImageArtifactDetails;
+                targetContext = srcContextList.First(item => item.Path == Options.InitialImageInfoPath).Context;
 
                 // Store a deep copy of the initial state for comparison if CommitUrlOverride is specified
                 if (!string.IsNullOrEmpty(Options.CommitOverride))
                 {
-                    initialImageArtifactDetails = ImageInfoHelper.LoadFromContent(
-                        JsonHelper.SerializeObject(targetImageArtifactDetails),
+                    initialContext = ImageInfoHelper.LoadFromContentWithContext(
+                        JsonHelper.SerializeObject(targetContext.Details),
                         Manifest,
                         skipManifestValidation: Options.IsPublishScenario
                     );
@@ -67,29 +66,29 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
 
                 if (Options.IsPublishScenario)
                 {
-                    RemoveOutOfDateContent(targetImageArtifactDetails);
+                    RemoveOutOfDateContent(targetContext);
                 }
             }
             else
             {
-                targetImageArtifactDetails = new ImageArtifactDetails();
+                targetContext = new ImageArtifactContext(new ImageArtifactDetails());
             }
 
-            foreach (ImageArtifactDetails srcImageArtifactDetails in
-                srcImageArtifactDetailsList
-                    .Select(item => item.ImageArtifactDetails)
-                    .Where(details => details != targetImageArtifactDetails))
+            foreach (ImageArtifactContext srcContext in
+                srcContextList
+                    .Select(item => item.Context)
+                    .Where(ctx => ctx.Details != targetContext.Details))
             {
-                ImageInfoHelper.MergeImageArtifactDetails(srcImageArtifactDetails, targetImageArtifactDetails, options);
+                ImageInfoHelper.MergeImageArtifactDetails(srcContext, targetContext, options);
             }
 
             // Apply CommitUrl override to updated images
-            if (!string.IsNullOrEmpty(Options.CommitOverride) && initialImageArtifactDetails != null)
+            if (!string.IsNullOrEmpty(Options.CommitOverride) && initialContext != null)
             {
-                ApplyCommitOverrideToUpdatedImages(targetImageArtifactDetails, initialImageArtifactDetails, Options.CommitOverride);
+                ApplyCommitOverrideToUpdatedImages(targetContext, initialContext, Options.CommitOverride);
             }
 
-            string destinationContents = JsonHelper.SerializeObject(targetImageArtifactDetails) + Environment.NewLine;
+            string destinationContents = JsonHelper.SerializeObject(targetContext.Details) + Environment.NewLine;
             File.WriteAllText(Options.DestinationImageInfoPath, destinationContents);
 
             return Task.CompletedTask;
@@ -99,21 +98,9 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
         /// Applies a commit URL override to platforms that have been updated
         /// since the initial state.
         /// </summary>
-        /// <param name="current">
-        /// The current merged image artifact details containing all platforms.
-        /// This instance will be modified with the <see cref="commitOverride"/>
-        /// </param>
-        /// <param name="initial">
-        /// The initial image artifact details used for comparison to detect
-        /// updates.
-        /// </param>
-        /// <param name="commitOverride">
-        /// This commit will be inserted into the CommitUrl of any platforms
-        /// that were updated compared to the initial image info.
-        /// </param>
         private static void ApplyCommitOverrideToUpdatedImages(
-            ImageArtifactDetails current,
-            ImageArtifactDetails initial,
+            ImageArtifactContext currentContext,
+            ImageArtifactContext initialContext,
             string commitOverride)
         {
             // If commitOverride does not contain a valid SHA, throw an error
@@ -124,36 +111,26 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
                     nameof(commitOverride));
             }
 
-            foreach (RepoData currentRepo in current.Repos)
+            foreach (RepoData currentRepo in currentContext.Details.Repos)
             {
-                RepoData? initialRepo = initial.Repos
+                RepoData? initialRepo = initialContext.Details.Repos
                     .FirstOrDefault(r => r.CompareTo(currentRepo) == 0);
 
                 foreach (ImageData currentImage in currentRepo.Images)
                 {
-                    // Match images without relying on ImageData.CompareTo, which throws when
-                    // ManifestImage is null.
-                    //
-                    // ManifestImage will be null when we're parsing a manifest file where the
-                    // "initial" image was replaced or removed in the build where the "current"
-                    // image was built. For example, this can happen when all the tags change for
-                    // an image,
-                    //
-                    // This means if initialImage.ManifestImage is null, then we can essentially
-                    // treat this currentImage as a new image.
+                    // Match images by ProductVersion since ManifestImage is no longer available on the model.
+                    // Use context to get the ManifestImage for checking if it's a valid image.
+                    ImageInfo? currentManifestImage = currentContext.GetImageInfo(currentImage);
 
                     ImageData? initialImage = null;
-                    if (initialRepo is not null)
+                    if (initialRepo is not null && currentManifestImage is not null)
                     {
-                        if (currentImage.ManifestImage is not null)
-                        {
-                            initialImage = initialRepo.Images
-                                .FirstOrDefault(i => i.ManifestImage == currentImage.ManifestImage);
-                        }
-
-                        // By leaving initialImage null here, we are marking currentImage as a new
-                        // image, since no initial image was found that matches it.
+                        // Find initial image that has the same ManifestImage (via context lookup)
+                        initialImage = initialRepo.Images
+                            .FirstOrDefault(i => initialContext.GetImageInfo(i) == currentManifestImage);
                     }
+
+                    // If no match found by ManifestImage reference, the currentImage is treated as new
 
                     foreach (PlatformData currentPlatform in currentImage.Platforms)
                     {
@@ -178,8 +155,10 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
             }
         }
 
-        private void RemoveOutOfDateContent(ImageArtifactDetails imageArtifactDetails)
+        private void RemoveOutOfDateContent(ImageArtifactContext context)
         {
+            ImageArtifactDetails imageArtifactDetails = context.Details;
+
             for (int repoIndex = imageArtifactDetails.Repos.Count - 1; repoIndex >= 0; repoIndex--)
             {
                 RepoData repoData = imageArtifactDetails.Repos[repoIndex];
@@ -198,7 +177,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
                 for (int imageIndex = repoData.Images.Count - 1; imageIndex >= 0; imageIndex--)
                 {
                     ImageData imageData = repoData.Images[imageIndex];
-                    ImageInfo manifestImage = imageData.ManifestImage;
+                    ImageInfo? manifestImage = context.GetImageInfo(imageData);
 
                     // If there doesn't exist a matching image in the manifest, remove it from the image info
                     if (manifestImage is null)
@@ -210,8 +189,10 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
                     for (int platformIndex = imageData.Platforms.Count - 1; platformIndex >= 0; platformIndex--)
                     {
                         PlatformData platformData = imageData.Platforms[platformIndex];
-                        PlatformInfo? manifestPlatform = manifestImage.AllPlatforms
-                            .FirstOrDefault(manifestPlatform => platformData.PlatformInfo == manifestPlatform);
+                        PlatformInfo? platformInfo = context.GetPlatformInfo(platformData);
+                        PlatformInfo? manifestPlatform = platformInfo is not null
+                            ? manifestImage.AllPlatforms.FirstOrDefault(mp => mp == platformInfo)
+                            : null;
 
                         // If there doesn't exist a matching platform in the manifest, remove it from the image info
                         if (manifestPlatform is null)

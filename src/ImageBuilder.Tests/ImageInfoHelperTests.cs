@@ -10,7 +10,6 @@ using Microsoft.DotNet.ImageBuilder.Models.Image;
 using Microsoft.DotNet.ImageBuilder.Models.Manifest;
 using Microsoft.DotNet.ImageBuilder.Tests.Helpers;
 using Microsoft.DotNet.ImageBuilder.ViewModel;
-using Moq;
 using Xunit;
 
 using static Microsoft.DotNet.ImageBuilder.Tests.Helpers.DockerfileHelper;
@@ -97,19 +96,20 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
             ManifestInfo manifestInfo = ManifestInfo.Load(new FakeManifestOptions(manifestPath));
             string expected = JsonHelper.SerializeObject(imageArtifactDetails);
 
-            ImageArtifactDetails result = ImageInfoHelper.LoadFromContent(expected, manifestInfo);
+            ImageArtifactContext context = ImageInfoHelper.LoadFromContentWithContext(expected, manifestInfo);
+            ImageArtifactDetails result = context.Details;
 
             Assert.Equal(expected, JsonHelper.SerializeObject(result));
             RepoData repo = result.Repos.First();
             ImageData image = repo.Images.First();
             RepoInfo expectedRepo = manifestInfo.AllRepos.First();
             ImageInfo expectedImage = expectedRepo.AllImages.First();
-            Assert.Same(expectedImage, image.ManifestImage);
-            Assert.Same(expectedRepo, image.ManifestRepo);
+            Assert.Same(expectedImage, context.GetImageInfo(image));
+            Assert.Same(expectedRepo, context.GetRepoInfo(image));
 
-            Assert.Same(expectedImage, image.Platforms.First().ImageInfo);
-            Assert.Same(expectedImage.AllPlatforms.First(), image.Platforms.First().PlatformInfo);
-            Assert.Same(expectedImage.AllPlatforms.Last(), image.Platforms.Last().PlatformInfo);
+            Assert.Same(expectedImage, context.GetImageInfoForPlatform(image.Platforms.First()));
+            Assert.Same(expectedImage.AllPlatforms.First(), context.GetPlatformInfo(image.Platforms.First()));
+            Assert.Same(expectedImage.AllPlatforms.Last(), context.GetPlatformInfo(image.Platforms.Last()));
         }
 
         [Fact]
@@ -166,19 +166,20 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
             ManifestInfo manifestInfo = ManifestInfo.Load(new FakeManifestOptions(manifestPath));
             string expected = JsonHelper.SerializeObject(imageArtifactDetails);
 
-            ImageArtifactDetails result = ImageInfoHelper.LoadFromContent(expected, manifestInfo);
+            ImageArtifactContext context = ImageInfoHelper.LoadFromContentWithContext(expected, manifestInfo);
+            ImageArtifactDetails result = context.Details;
 
             Assert.Equal(expected, JsonHelper.SerializeObject(result));
             RepoData repo = result.Repos.First();
             ImageData image = repo.Images.First();
             RepoInfo expectedRepo = manifestInfo.AllRepos.First();
             ImageInfo expectedImage = expectedRepo.AllImages.First();
-            Assert.Same(expectedImage, image.ManifestImage);
-            Assert.Same(expectedRepo, image.ManifestRepo);
+            Assert.Same(expectedImage, context.GetImageInfo(image));
+            Assert.Same(expectedRepo, context.GetRepoInfo(image));
 
-            Assert.Same(expectedImage, image.Platforms.First().ImageInfo);
-            Assert.Same(expectedImage.AllPlatforms.First(), image.Platforms.First().PlatformInfo);
-            Assert.Same(expectedImage.AllPlatforms.Last(), image.Platforms.Last().PlatformInfo);
+            Assert.Same(expectedImage, context.GetImageInfoForPlatform(image.Platforms.First()));
+            Assert.Same(expectedImage.AllPlatforms.First(), context.GetPlatformInfo(image.Platforms.First()));
+            Assert.Same(expectedImage.AllPlatforms.Last(), context.GetPlatformInfo(image.Platforms.Last()));
         }
 
         [Fact]
@@ -257,17 +258,16 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
             ManifestInfo manifestInfo = ManifestInfo.Load(new FakeManifestOptions(manifestPath));
             string expected = JsonHelper.SerializeObject(imageArtifactDetails);
 
-            ImageArtifactDetails result = ImageInfoHelper.LoadFromContent(expected, manifestInfo);
+            ImageArtifactContext context = ImageInfoHelper.LoadFromContentWithContext(expected, manifestInfo);
+            ImageArtifactDetails result = context.Details;
 
-            Assert.Same(manifestInfo.AllRepos.First().AllImages.First(), result.Repos[0].Images[0].ManifestImage);
-            Assert.Same(manifestInfo.AllRepos.First().AllImages.ElementAt(1), result.Repos[0].Images[1].ManifestImage);
+            Assert.Same(manifestInfo.AllRepos.First().AllImages.First(), context.GetImageInfo(result.Repos[0].Images[0]));
+            Assert.Same(manifestInfo.AllRepos.First().AllImages.ElementAt(1), context.GetImageInfo(result.Repos[0].Images[1]));
         }
 
         [Fact]
         public void ImageInfoHelper_MergeRepos_ImageDigest()
         {
-            ImageInfo imageInfo1 = CreateImageInfo();
-
             ImageArtifactDetails imageArtifactDetails = new ImageArtifactDetails
             {
                 Repos =
@@ -279,14 +279,12 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
                         {
                             new ImageData
                             {
-                                ManifestImage = imageInfo1,
                                 Platforms =
                                 {
                                     new PlatformData
                                     {
                                         Dockerfile = "image1",
-                                        Digest = "digest",
-                                        ImageInfo = imageInfo1
+                                        Digest = "digest"
                                     }
                                 },
                                 ProductVersion = "1.0"
@@ -307,13 +305,11 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
                         {
                             new ImageData
                             {
-                                ManifestImage = imageInfo1,
                                 Platforms =
                                 {
                                     new PlatformData
                                     {
-                                        Dockerfile = "image1",
-                                        ImageInfo = imageInfo1
+                                        Dockerfile = "image1"
                                     }
                                 },
                                 ProductVersion = "1.0"
@@ -375,9 +371,6 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
             DateTime oldCreatedDate = DateTime.Now.Subtract(TimeSpan.FromDays(1));
             DateTime newCreatedDate = DateTime.Now;
 
-            ImageInfo imageInfo1 = CreateImageInfo();
-            ImageInfo imageInfo2 = CreateImageInfo();
-
             ImageArtifactDetails imageArtifactDetails = new ImageArtifactDetails
             {
                 Repos =
@@ -389,7 +382,6 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
                         {
                             new ImageData
                             {
-                                ManifestImage = imageInfo1,
                                 Platforms =
                                 {
                                     {
@@ -397,15 +389,13 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
                                         {
                                             Dockerfile = "image1",
                                             BaseImageDigest = "base1digest-NEW",
-                                            Created = newCreatedDate,
-                                            ImageInfo = imageInfo1
+                                            Created = newCreatedDate
                                         }
                                     },
                                     {
                                         repo2Image3  = new PlatformData
                                         {
-                                            Dockerfile = "image3",
-                                            ImageInfo = imageInfo1
+                                            Dockerfile = "image3"
                                         }
                                     }
                                 },
@@ -420,14 +410,12 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
                         {
                             new ImageData
                             {
-                                ManifestImage = imageInfo2,
                                 Platforms =
                                 {
                                     {
                                         repo3Image1 = new PlatformData
                                         {
-                                            Dockerfile = "image1",
-                                            ImageInfo = imageInfo2
+                                            Dockerfile = "image1"
                                         }
                                     }
                                 },
@@ -457,22 +445,19 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
                         {
                             new ImageData
                             {
-                                ManifestImage = imageInfo1,
                                 Platforms =
                                 {
                                     new PlatformData
                                     {
                                         Dockerfile = "image1",
                                         BaseImageDigest = "base1digest",
-                                        Created = oldCreatedDate,
-                                        ImageInfo = imageInfo1
+                                        Created = oldCreatedDate
                                     },
                                     {
                                         repo2Image2 = new PlatformData
                                         {
                                             Dockerfile = "image2",
-                                            BaseImageDigest = "base2digest",
-                                            ImageInfo = imageInfo1
+                                            BaseImageDigest = "base2digest"
                                         }
                                     }
                                 },
@@ -548,8 +533,6 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
             PlatformData srcImage1;
             PlatformData targetImage2;
 
-            ImageInfo imageInfo1 = CreateImageInfo();
-
             ImageArtifactDetails imageArtifactDetails = new ImageArtifactDetails
             {
                 Repos =
@@ -561,7 +544,6 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
                         {
                             new ImageData
                             {
-                                ManifestImage = imageInfo1,
                                 Platforms =
                                 {
                                     {
@@ -572,8 +554,7 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
                                             {
                                                 "tag1",
                                                 "tag3"
-                                            },
-                                            ImageInfo = imageInfo1
+                                            }
                                         }
                                     }
                                 },
@@ -603,7 +584,6 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
                         {
                             new ImageData
                             {
-                                ManifestImage = imageInfo1,
                                 Platforms =
                                 {
                                     new PlatformData
@@ -614,8 +594,7 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
                                             "tag1",
                                             "tag2",
                                             "tag4"
-                                        },
-                                        ImageInfo = imageInfo1
+                                        }
                                     },
                                     {
                                         targetImage2 = new PlatformData
@@ -624,8 +603,7 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
                                             SimpleTags =
                                             {
                                                 "a"
-                                            },
-                                            ImageInfo = imageInfo1
+                                            }
                                         }
                                     }
                                 },
@@ -702,8 +680,6 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
             PlatformData srcPlatform1;
             PlatformData targetPlatform2;
 
-            ImageInfo imageInfo1 = CreateImageInfo();
-
             ImageArtifactDetails imageArtifactDetails = new ImageArtifactDetails
             {
                 Repos =
@@ -715,7 +691,6 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
                         {
                             new ImageData
                             {
-                                ManifestImage = imageInfo1,
                                 Platforms =
                                 {
                                     {
@@ -726,8 +701,7 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
                                             {
                                                 "tag3",
                                                 "tag1"
-                                            },
-                                            ImageInfo = imageInfo1
+                                            }
                                         }
                                     }
                                 },
@@ -757,7 +731,6 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
                         {
                             new ImageData
                             {
-                                ManifestImage = imageInfo1,
                                 Platforms =
                                 {
                                     {
@@ -769,8 +742,7 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
                                                 "tag1",
                                                 "tag2",
                                                 "tag4"
-                                            },
-                                            ImageInfo = imageInfo1
+                                            }
                                         }
                                     },
                                     {
@@ -780,8 +752,7 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
                                             SimpleTags =
                                             {
                                                 "a"
-                                            },
-                                            ImageInfo = imageInfo1
+                                            }
                                         }
                                     }
                                 },
@@ -851,9 +822,6 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
         [Fact]
         public void Merge_DuplicatedPlatforms()
         {
-            ImageInfo imageInfo1 = CreateImageInfo();
-            ImageInfo imageInfo2 = CreateImageInfo();
-
             ImageArtifactDetails imageArtifactDetails = new ImageArtifactDetails
             {
                 Repos =
@@ -865,7 +833,6 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
                         {
                             new ImageData
                             {
-                                ManifestImage = imageInfo1,
                                 Platforms =
                                 {
                                     new PlatformData
@@ -890,7 +857,6 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
                         {
                             new ImageData
                             {
-                                ManifestImage = imageInfo2,
                                 Platforms =
                                 {
                                     new PlatformData
@@ -948,9 +914,6 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
 
             ImageInfoHelper.MergeImageArtifactDetails(imageArtifactDetails, targetImageArtifactDetails);
             CompareImageArtifactDetails(expectedImageArtifactDetails, targetImageArtifactDetails);
-
-            Assert.Same(imageInfo1, targetImageArtifactDetails.Repos[0].Images[0].ManifestImage);
-            Assert.Same(imageInfo2, targetImageArtifactDetails.Repos[0].Images[1].ManifestImage);
         }
 
         [Fact]
@@ -968,7 +931,6 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
                             new ImageData
                             {
                                 ProductVersion = "1.0",
-                                ManifestImage = CreateImageInfo(),
                                 Platforms =
                                 {
                                     new PlatformData
@@ -1001,7 +963,6 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
                             new ImageData
                             {
                                 ProductVersion = "2.0",
-                                ManifestImage = CreateImageInfo(),
                                 Platforms =
                                 {
                                     new PlatformData
@@ -1107,8 +1068,6 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
         [Fact]
         public void ImageInfoHelper_MergeRepos_NewManifest()
         {
-            ImageInfo imageInfo1 = CreateImageInfo();
-
             ImageArtifactDetails srcImageArtifactDetails = new ImageArtifactDetails
             {
                 Repos =
@@ -1120,7 +1079,6 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
                         {
                             new ImageData
                             {
-                                ManifestImage = imageInfo1,
                                 Manifest = new ManifestData
                                 {
                                     SharedTags = new List<string>
@@ -1133,8 +1091,7 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
                                     new PlatformData
                                     {
                                         Dockerfile = "image1",
-                                        Digest = "digest",
-                                        ImageInfo = imageInfo1
+                                        Digest = "digest"
                                     }
                                 },
                                 ProductVersion = "1.0"
@@ -1155,13 +1112,11 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
                         {
                             new ImageData
                             {
-                                ManifestImage = imageInfo1,
                                 Platforms =
                                 {
                                     new PlatformData
                                     {
-                                        Dockerfile = "image1",
-                                        ImageInfo = imageInfo1
+                                        Dockerfile = "image1"
                                     }
                                 },
                                 ProductVersion = "1.0"
@@ -1181,8 +1136,6 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
         [Fact]
         public void ImageInfoHelper_MergeRepos_RemovedManifest()
         {
-            ImageInfo imageInfo1 = CreateImageInfo();
-
             ImageArtifactDetails srcImageArtifactDetails = new ImageArtifactDetails
             {
                 Repos =
@@ -1194,14 +1147,12 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
                         {
                             new ImageData
                             {
-                                ManifestImage = imageInfo1,
                                 Platforms =
                                 {
                                     new PlatformData
                                     {
                                         Dockerfile = "image1",
-                                        Digest = "digest",
-                                        ImageInfo = imageInfo1
+                                        Digest = "digest"
                                     }
                                 },
                                 ProductVersion = "1.0"
@@ -1222,7 +1173,6 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
                         {
                             new ImageData
                             {
-                                ManifestImage = imageInfo1,
                                 Manifest = new ManifestData
                                 {
                                     SharedTags = new List<string>
@@ -1234,8 +1184,7 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
                                 {
                                     new PlatformData
                                     {
-                                        Dockerfile = "image1",
-                                        ImageInfo = imageInfo1
+                                        Dockerfile = "image1"
                                     }
                                 },
                                 ProductVersion = "1.0"
@@ -1248,19 +1197,6 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
             ImageInfoHelper.MergeImageArtifactDetails(srcImageArtifactDetails, targetImageArtifactDetails);
             CompareImageArtifactDetails(srcImageArtifactDetails, targetImageArtifactDetails);
         }
-
-        private static ImageInfo CreateImageInfo() =>
-            ImageInfo.Create(
-                new Image
-                {
-                    Platforms = Array.Empty<Platform>(),
-                    ProductVersion = "1.0"
-                },
-                "fullrepo",
-                "repo",
-                new ManifestFilter(Enumerable.Empty<string>()),
-                new VariableHelper(new Manifest(), Mock.Of<IManifestOptionsInfo>(), null),
-                "base");
 
         private class FakeManifestOptions : IManifestOptionsInfo
         {

@@ -17,7 +17,7 @@ public class ImageArtifactDetailsTests(ITestOutputHelper outputHelper)
     [Fact]
     public void CanReadJsonSchemaVersion1()
     {
-        ImageArtifactDetails details = ImageArtifactDetails.FromJson(JsonSchemaVersion1);
+        ImageArtifactDetails details = ImageArtifactDetailsHelper.FromJson(JsonSchemaVersion1);
         details.ShouldNotBeNull();
 
         // When reading schema version 1.0, it will be automatically converted to version 2.0
@@ -48,7 +48,7 @@ public class ImageArtifactDetailsTests(ITestOutputHelper outputHelper)
     [Fact]
     public void CanReadJsonSchemaVersion2()
     {
-        ImageArtifactDetails details = ImageArtifactDetails.FromJson(JsonSchemaVersion2);
+        ImageArtifactDetails details = ImageArtifactDetailsHelper.FromJson(JsonSchemaVersion2);
         details.ShouldNotBeNull();
 
         // When reading schema version 1.0, it will be automatically converted to version 2.0

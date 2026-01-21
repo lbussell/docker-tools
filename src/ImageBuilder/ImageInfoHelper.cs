@@ -115,7 +115,7 @@ namespace Microsoft.DotNet.ImageBuilder
         public static ImageArtifactDetails DeserializeImageArtifactDetails(string path)
         {
             string imageInfoText = File.ReadAllText(path);
-            return ImageArtifactDetails.FromJson(imageInfoText) ??
+            return ImageArtifactDetailsHelper.FromJson(imageInfoText) ??
                 throw new InvalidDataException($"Unable to deserialize image info file {path}");
         }
 
@@ -132,7 +132,7 @@ namespace Microsoft.DotNet.ImageBuilder
         public static ImageArtifactContext LoadFromContentWithContext(string imageInfoContent, ManifestInfo manifest,
             bool skipManifestValidation = false, bool useFilteredManifest = false)
         {
-            ImageArtifactDetails imageArtifactDetails = ImageArtifactDetails.FromJson(imageInfoContent);
+            ImageArtifactDetails imageArtifactDetails = ImageArtifactDetailsHelper.FromJson(imageInfoContent);
             ImageArtifactContext context = new(imageArtifactDetails);
 
             foreach (RepoData repoData in imageArtifactDetails.Repos)
@@ -213,51 +213,7 @@ namespace Microsoft.DotNet.ImageBuilder
         {
             // Use context-based loading internally
             ImageArtifactContext context = LoadFromContentWithContext(imageInfoContent, manifest, skipManifestValidation, useFilteredManifest);
-
-            // Populate model properties from context for backward compatibility
-            PopulateModelPropertiesFromContext(context);
-
             return context.Details;
-        }
-
-        /// <summary>
-        /// Populates the [JsonIgnore] ViewModel properties on model objects from the context.
-        /// This is for backward compatibility during the migration to context-based lookups.
-        /// </summary>
-        private static void PopulateModelPropertiesFromContext(ImageArtifactContext context)
-        {
-            foreach (RepoData repoData in context.Details.Repos)
-            {
-                foreach (ImageData imageData in repoData.Images)
-                {
-                    ImageInfo imageInfo = context.GetImageInfo(imageData);
-                    RepoInfo repoInfo = context.GetRepoInfo(imageData);
-
-                    if (imageInfo != null)
-                    {
-                        imageData.ManifestImage = imageInfo;
-                    }
-                    if (repoInfo != null)
-                    {
-                        imageData.ManifestRepo = repoInfo;
-                    }
-
-                    foreach (PlatformData platformData in imageData.Platforms)
-                    {
-                        PlatformInfo platformInfo = context.GetPlatformInfo(platformData);
-                        ImageInfo platformImageInfo = context.GetImageInfoForPlatform(platformData);
-
-                        if (platformInfo != null)
-                        {
-                            platformData.PlatformInfo = platformInfo;
-                        }
-                        if (platformImageInfo != null)
-                        {
-                            platformData.ImageInfo = platformImageInfo;
-                        }
-                    }
-                }
-            }
         }
 
         /// <summary>
@@ -291,7 +247,7 @@ namespace Microsoft.DotNet.ImageBuilder
             foreach (ImageData imageData in repoData.Images)
             {
                 PlatformData platformData = imageData.Platforms
-                    .FirstOrDefault(platformData => platformData.PlatformInfo == platform);
+                    .FirstOrDefault(pd => IsPlatformMatch(pd, platform));
                 if (platformData != null)
                 {
                     return (platformData, imageData);
@@ -299,6 +255,17 @@ namespace Microsoft.DotNet.ImageBuilder
             }
 
             return null;
+        }
+
+        /// <summary>
+        /// Checks if a PlatformData matches a PlatformInfo by comparing identifying properties.
+        /// </summary>
+        private static bool IsPlatformMatch(PlatformData platformData, PlatformInfo platformInfo)
+        {
+            return platformData.Dockerfile == platformInfo.DockerfilePathRelativeToManifest &&
+                   platformData.Architecture == platformInfo.Model.Architecture.GetDisplayName() &&
+                   platformData.OsType == platformInfo.Model.OS.ToString() &&
+                   platformData.OsVersion == platformInfo.Model.OsVersion;
         }
 
         /// <summary>
@@ -338,13 +305,112 @@ namespace Microsoft.DotNet.ImageBuilder
             MergeData(src, target, options);
         }
 
+        /// <summary>
+        /// Merges image artifact details using contexts to match images by their manifest associations.
+        /// </summary>
+        public static void MergeImageArtifactDetails(
+            ImageArtifactContext srcContext,
+            ImageArtifactContext targetContext,
+            ImageInfoMergeOptions options = null)
+        {
+            if (options == null)
+            {
+                options = new ImageInfoMergeOptions();
+            }
+
+            ImageArtifactDetails src = srcContext.Details;
+            ImageArtifactDetails target = targetContext.Details;
+
+            // Merge repos
+            foreach (RepoData srcRepo in src.Repos)
+            {
+                RepoData targetRepo = target.Repos.FirstOrDefault(r => r.Repo == srcRepo.Repo);
+                if (targetRepo == null)
+                {
+                    target.Repos.Add(srcRepo);
+                    
+                    // Copy context mappings for all images in the added repo
+                    foreach (ImageData srcImage in srcRepo.Images)
+                    {
+                        ImageInfo srcImageInfo = srcContext.GetImageInfo(srcImage);
+                        if (srcImageInfo != null)
+                        {
+                            RepoInfo repoInfo = srcContext.GetRepoInfo(srcImage);
+                            targetContext.SetImageContext(srcImage, srcImageInfo, repoInfo);
+                            
+                            foreach (PlatformData platform in srcImage.Platforms)
+                            {
+                                PlatformInfo platformInfo = srcContext.GetPlatformInfo(platform);
+                                if (platformInfo != null)
+                                {
+                                    ImageInfo platformImageInfo = srcContext.GetImageInfoForPlatform(platform);
+                                    targetContext.SetPlatformContext(platform, platformInfo, platformImageInfo);
+                                }
+                            }
+                        }
+                    }
+                    continue;
+                }
+
+                // Merge images within the repo using context-based matching
+                foreach (ImageData srcImage in srcRepo.Images)
+                {
+                    ImageInfo srcImageInfo = srcContext.GetImageInfo(srcImage);
+
+                    // Find matching target image - they should map to the same manifest ImageInfo
+                    // Since the same manifest is used for loading all files, ImageInfo references should match
+                    ImageData targetImage = null;
+                    
+                    if (srcImageInfo != null)
+                    {
+                        targetImage = targetRepo.Images
+                            .FirstOrDefault(img => targetContext.GetImageInfo(img) == srcImageInfo);
+                    }
+
+                    if (targetImage != null)
+                    {
+                        // Merge the images
+                        MergeData(srcImage, targetImage, options);
+                    }
+                    else
+                    {
+                        // No matching image found, add the source image
+                        targetRepo.Images.Add(srcImage);
+                        
+                        // Copy context mappings for the added image to target context
+                        if (srcImageInfo != null)
+                        {
+                            RepoInfo repoInfo = srcContext.GetRepoInfo(srcImage);
+                            targetContext.SetImageContext(srcImage, srcImageInfo, repoInfo);
+                            
+                            // Also copy platform mappings
+                            foreach (PlatformData platform in srcImage.Platforms)
+                            {
+                                PlatformInfo platformInfo = srcContext.GetPlatformInfo(platform);
+                                if (platformInfo != null)
+                                {
+                                    ImageInfo platformImageInfo = srcContext.GetImageInfoForPlatform(platform);
+                                    targetContext.SetPlatformContext(platform, platformInfo, platformImageInfo);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Sort images
+                targetRepo.Images.Sort();
+            }
+
+            // Sort repos
+            target.Repos.Sort();
+        }
+
         private static bool ArePlatformsEqual(PlatformData platformData, ImageData imageData, PlatformInfo platform, ImageInfo manifestImage)
         {
-            PlatformData otherPlatform = PlatformData.FromPlatformInfo(platform, manifestImage);
-            // We can't use PlatformData.CompareTo here because it relies on having its PlatformInfo and ImageInfo values fully populated
-            // which is what this class is trying to make happen.
+            PlatformData otherPlatform = PlatformDataFactory.FromPlatformInfo(platform, manifestImage);
+            // Compare without product version since we compare versions separately
             return !platformData.HasDifferentTagState(otherPlatform) &&
-                platformData.GetIdentifier(excludeProductVersion: true) == otherPlatform.GetIdentifier(excludeProductVersion: true) &&
+                platformData.GetIdentifier() == otherPlatform.GetIdentifier() &&
                 AreProductVersionsEquivalent(imageData.ProductVersion, manifestImage.ProductVersion);
         }
 

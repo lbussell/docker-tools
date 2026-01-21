@@ -57,11 +57,8 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
                         PlatformData platform = image.Platforms[i];
                         if (platform.IsUnchanged)
                         {
-                            // Exclude the ProductVersion from the identifier because it requires the ImageInfo to be set on the platform.
-                            // But it's not set because we haven't used ImageInfoHelper to load it, we've just deserialized it directly.
-                            // Using ImageInfoHelper requires having the manifest but that seems unnecessary since it's not needed for the logic
-                            // of this command other than this simple logging statement.
-                            _loggerService.WriteMessage($"Removing unchanged platform '{platform.GetIdentifier(excludeProductVersion: true)}'");
+                            // Use GetIdentifier() without product version since we don't have ImageInfo set
+                            _loggerService.WriteMessage($"Removing unchanged platform '{platform.GetIdentifier()}'");
                             image.Platforms.Remove(platform);
                         }
                     }

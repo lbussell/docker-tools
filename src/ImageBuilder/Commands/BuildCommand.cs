@@ -102,11 +102,9 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
         {
             Options.BaseImageOverrideOptions.Validate();
 
-            if (Options.ImageInfoOutputPath != null)
-            {
-                _imageArtifactDetails = new ImageArtifactDetails();
-                _imageArtifactContext = new ImageArtifactContext(_imageArtifactDetails);
-            }
+            // Always create a context to track platform-to-manifest associations
+            _imageArtifactDetails = new ImageArtifactDetails();
+            _imageArtifactContext = new ImageArtifactContext(_imageArtifactDetails);
 
             await ExecuteWithDockerCredentialsAsync(PullBaseImagesAsync);
             await BuildImagesAsync();
@@ -414,7 +412,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
 
         private PlatformData CreatePlatformData(ImageInfo image, PlatformInfo platform)
         {
-            PlatformData platformData = PlatformData.FromPlatformInfo(platform, image);
+            PlatformData platformData = PlatformDataFactory.FromPlatformInfo(platform, image);
             platformData.SimpleTags = platform.Tags
                 .Select(tag => tag.Name)
                 .OrderBy(name => name)
@@ -790,15 +788,15 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
         }
 
         /// <summary>
-        /// Gets PlatformInfo for a PlatformData, using context if available, otherwise falling back to direct property.
+        /// Gets PlatformInfo for a PlatformData using the context.
         /// </summary>
         private PlatformInfo? GetPlatformInfo(PlatformData platformData) =>
-            _imageArtifactContext?.GetPlatformInfo(platformData) ?? platformData.PlatformInfo;
+            _imageArtifactContext?.GetPlatformInfo(platformData);
 
         /// <summary>
-        /// Gets ImageInfo for a PlatformData, using context if available, otherwise falling back to direct property.
+        /// Gets ImageInfo for a PlatformData using the context.
         /// </summary>
         private ImageInfo? GetImageInfo(PlatformData platformData) =>
-            _imageArtifactContext?.GetImageInfoForPlatform(platformData) ?? platformData.ImageInfo;
+            _imageArtifactContext?.GetImageInfoForPlatform(platformData);
     }
 }

@@ -67,14 +67,14 @@ public class ImageCacheService : IImageCacheService
         ImageCacheState cacheState = ImageCacheState.NotCached;
         bool isNewCacheHit = false;
 
-        // Get PlatformInfo from context if available, otherwise fall back to direct property
-        PlatformInfo? platformInfo = context?.GetPlatformInfo(platformData) ?? platformData.PlatformInfo;
+        // Get PlatformInfo from context
+        PlatformInfo? platformInfo = context?.GetPlatformInfo(platformData);
 
         // Find srcPlatformData using the source context
         PlatformData? srcPlatformData = srcImageData?.Platforms
             .FirstOrDefault(srcPlatform =>
             {
-                PlatformInfo? srcPlatformInfo = srcContext?.GetPlatformInfo(srcPlatform) ?? srcPlatform.PlatformInfo;
+                PlatformInfo? srcPlatformInfo = srcContext?.GetPlatformInfo(srcPlatform);
                 return srcPlatformInfo == platformInfo;
             });
 
@@ -130,7 +130,7 @@ public class ImageCacheService : IImageCacheService
 
     private static bool CachedPlatformHasAllTagsPublished(PlatformData srcPlatformData, ImageArtifactContext? srcContext)
     {
-        PlatformInfo? platformInfo = srcContext?.GetPlatformInfo(srcPlatformData) ?? srcPlatformData.PlatformInfo;
+        PlatformInfo? platformInfo = srcContext?.GetPlatformInfo(srcPlatformData);
         return (platformInfo?.Tags ?? [])
             .Select(tag => tag.Name)
             .AreEquivalent(srcPlatformData.SimpleTags);
