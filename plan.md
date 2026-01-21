@@ -16,6 +16,47 @@ The ImageBuilder project contains model classes (`Models/Manifest/`, `Models/Ima
 
 **Goal**: Enable other repos (e.g., FilePusher, docker-dotnet unit tests) to easily read, query, and edit Manifest and ImageArtifactDetails JSON files with the same results as ImageBuilder.
 
+## Current Progress (2026-01-21)
+
+### Completed
+- **Task 1: Manifest Models Migration** - COMPLETE ✅
+  - All 12 Manifest model files moved to `ImageBuilder.Models/Manifest/`
+  - Project reference added from ImageBuilder to ImageBuilder.Models
+  - Newtonsoft.Json package added to ImageBuilder.Models
+  - All 369 tests pass
+
+- **Task 2: Image Models Migration** - PARTIALLY COMPLETE (context foundation)
+  - Created `ImageArtifactContext` class to decouple data models from ViewModels
+  - Added `LoadFromContentWithContext` / `LoadFromFileWithContext` methods
+  - Migrated 6 commands to use context-based lookups:
+    - WaitForMcrImageIngestionCommand
+    - PublishManifestCommand
+    - CopyAcrImagesCommand
+    - IngestKustoImageInfoCommand
+    - PullImagesCommand
+    - PostPublishNotificationCommand
+
+### Blockers Discovered
+The Image models (`ImageData`, `PlatformData`) have `[JsonIgnore]` properties that reference ViewModel types. These create bidirectional references that are used extensively:
+
+1. **`BuildCommand`** - Creates NEW `PlatformData` objects and sets `ImageInfo`/`PlatformInfo` on them during build. Uses `PlatformData.FromPlatformInfo()`.
+
+2. **`ImageCacheService`** - Uses `PlatformInfo` for cache key generation and platform matching.
+
+3. **`MergeImageInfoCommand`** - The merge logic uses `ImageData.CompareTo` which requires `ManifestImage` to be set.
+
+4. **`ImageData.CompareTo`** - Throws `InvalidOperationException` if `ManifestImage` is null.
+
+### Solution Approach
+Created `ImageArtifactContext` class that provides:
+- Lookup dictionaries: `PlatformData → PlatformInfo`, `ImageData → ImageInfo`, etc.
+- Methods: `GetPlatformInfo()`, `GetImageInfo()`, `GetRepoInfo()`, `GetAllTags()`, etc.
+- This allows commands that READ image info to use context lookups instead of properties
+
+**Key Insight**: Commands fall into two categories:
+1. **Readers** - Load image info, process it. Can use context (migrated).
+2. **Writers** - Create/modify data during builds. Still need direct property access.
+
 ## Scope
 
 ### In Scope
@@ -43,44 +84,38 @@ The ImageBuilder project contains model classes (`Models/Manifest/`, `Models/Ima
 
 ## Tasks
 
-### Task 1: Migrate Manifest Models to ImageBuilder.Models
+### Task 1: Migrate Manifest Models to ImageBuilder.Models ✅ COMPLETE
 
 **Description**: Move the `Models/Manifest/` classes from ImageBuilder to ImageBuilder.Models, maintaining the existing class structure and Newtonsoft.Json serialization.
 
-**Files to migrate**:
-- `Manifest.cs`
-- `Repo.cs`
-- `Image.cs`
-- `Platform.cs`
-- `Tag.cs`
-- `Readme.cs`
-- `Architecture.cs` (enum)
-- `OS.cs` (enum)
-- `CustomBuildLegGroup.cs`
-- `CustomBuildLegDependencyType.cs` (enum)
-- `TagDocumentationType.cs` (enum)
-- `TagSyndication.cs`
+**Files migrated**:
+- `Manifest.cs`, `Repo.cs`, `Image.cs`, `Platform.cs`, `Tag.cs`, `Readme.cs`
+- `Architecture.cs` (enum), `OS.cs` (enum)
+- `CustomBuildLegGroup.cs`, `CustomBuildLegDependencyType.cs` (enum)
+- `TagDocumentationType.cs` (enum), `TagSyndication.cs`
 
 **Acceptance Criteria**:
-- [ ] All Manifest model classes exist in `ImageBuilder.Models` project
-- [ ] Namespace is `Microsoft.DotNet.ImageBuilder.Models.Manifest`
-- [ ] ImageBuilder references ImageBuilder.Models and compiles
-- [ ] Existing Newtonsoft.Json attributes preserved for compatibility
-- [ ] All ImageBuilder tests pass
-- [ ] No changes to serialized JSON output
+- [x] All Manifest model classes exist in `ImageBuilder.Models` project
+- [x] Namespace is `Microsoft.DotNet.ImageBuilder.Models.Manifest`
+- [x] ImageBuilder references ImageBuilder.Models and compiles
+- [x] Existing Newtonsoft.Json attributes preserved for compatibility
+- [x] All ImageBuilder tests pass
+- [x] No changes to serialized JSON output
 
 **Notes**:
-- Keep `[Description]` attributes for schema generation
-- Keep `[JsonProperty(Required = Required.Always)]` attributes
-- Add `<ProjectReference>` from ImageBuilder to ImageBuilder.Models
+- Nullable disabled in ImageBuilder.Models for now (Task 4 will enable)
+- Fixed license header in TagSyndication.cs
+- Run `dotnet format src/ImageBuilder.Models` for formatting (don't run on full ImageBuilder)
 
 ---
 
-### Task 2: Migrate Image Models to ImageBuilder.Models
+### Task 2: Migrate Image Models to ImageBuilder.Models (IN PROGRESS)
 
 **Description**: Move the `Models/Image/` classes from ImageBuilder to ImageBuilder.Models.
 
-**Files to migrate**:
+**Status**: BLOCKED - Need to complete Task 2a and 2b first.
+
+**Files to migrate** (after ViewModel decoupling):
 - `ImageArtifactDetails.cs`
 - `RepoData.cs`
 - `ImageData.cs`
@@ -93,13 +128,61 @@ The ImageBuilder project contains model classes (`Models/Manifest/`, `Models/Ima
 - [ ] Namespace is `Microsoft.DotNet.ImageBuilder.Models.Image`
 - [ ] ImageBuilder compiles with updated references
 - [ ] All ImageBuilder tests pass
-- [ ] `SchemaVersion2LayerConverter` removed (schema migration no longer needed)
-- [ ] `[JsonIgnore]` properties (`ImageInfo`, `PlatformInfo`, `ManifestImage`, `ManifestRepo`) remain in a separate extension/partial class in ImageBuilder (not in shared models)
+- [ ] `[JsonIgnore]` properties removed from models (ViewModel refs moved to context)
 
-**Notes**:
-- The `PlatformData` and `ImageData` classes have `[JsonIgnore]` properties that reference ViewModel types. These must stay in ImageBuilder.
-- Consider splitting into a core model (in ImageBuilder.Models) and an extension class (in ImageBuilder)
-- Remove the `SchemaVersion2LayerConverter` as the schema migration is no longer needed
+---
+
+### Task 2a: Migrate BuildCommand to use ImageArtifactContext (NEW)
+
+**Description**: Refactor `BuildCommand` to use the context pattern when creating and tracking `PlatformData` objects during builds.
+
+**Current Issue**: `BuildCommand` creates new `PlatformData` objects via `PlatformData.FromPlatformInfo()` and sets `ImageInfo`/`PlatformInfo` properties directly.
+
+**Approach**:
+- Create a context alongside `_imageArtifactDetails` in BuildCommand
+- Update `CreatePlatformData()` to register new platforms in the context
+- Update code that reads `platform.PlatformInfo` to use context lookups
+- Update `PlatformData.FromPlatformInfo()` to not set ViewModel properties
+
+**Acceptance Criteria**:
+- [ ] BuildCommand uses ImageArtifactContext for all ViewModel lookups
+- [ ] New platforms are registered in context when created
+- [ ] All build-related tests pass
+
+---
+
+### Task 2b: Migrate ImageCacheService to use ImageArtifactContext (NEW)
+
+**Description**: Refactor `ImageCacheService` to receive context instead of relying on `PlatformData.PlatformInfo`.
+
+**Current Issue**: `CheckForCachedImageAsync` uses `platformData.PlatformInfo` for cache key generation.
+
+**Approach**:
+- Add `ImageArtifactContext` parameter to `CheckForCachedImageAsync`
+- Update cache key generation to use `context.GetPlatformInfo(platformData)`
+- Update callers (BuildCommand) to pass context
+
+**Acceptance Criteria**:
+- [ ] ImageCacheService uses context for PlatformInfo lookups
+- [ ] All cache-related tests pass
+
+---
+
+### Task 2c: Update ImageData.CompareTo to not require ManifestImage (NEW)
+
+**Description**: The `CompareTo` method throws if `ManifestImage` is null. This blocks merge operations with context-based loading.
+
+**Current Issue**: `MergeImageArtifactDetails` uses `ImageData.CompareTo` which requires `ManifestImage`.
+
+**Approach Options**:
+1. Change comparison to use serializable properties only (ProductVersion + first Platform)
+2. Keep ManifestImage property but make comparison null-safe
+3. Create separate comparer class for merge operations
+
+**Acceptance Criteria**:
+- [ ] `ImageData.CompareTo` works without ManifestImage
+- [ ] Merge operations continue to work correctly
+- [ ] All merge-related tests pass
 
 ---
 
@@ -119,22 +202,12 @@ The ImageBuilder project contains model classes (`Models/Manifest/`, `Models/Ima
 - `ManifestDataSerializationTests.cs`
 - `LayerSerializationTests.cs`
 
-**Test scenarios for each model**:
-1. `Default{Model}_Bidirectional` - Default instance serializes to expected JSON and back
-2. `FullyPopulated{Model}_Bidirectional` - Fully populated instance serializes correctly
-3. `FullyPopulated{Model}_RoundTrip` - Round-trip serialization preserves data
-4. `Minimal{Model}_Bidirectional` - Minimal valid instance (only required fields)
-5. `Deserialization_{Property}IsRequired_Missing` - Required property missing throws
-6. `Deserialization_{Property}IsRequired_Null` - Required property null throws
-7. `Serialization_{Property}IsRequired_Null` - Serializing null required property throws
-
 **Acceptance Criteria**:
 - [ ] All Image models have serialization tests
 - [ ] Tests cover default, fully-populated, and minimal scenarios
 - [ ] Tests verify required property validation
 - [ ] Tests use `SerializationHelper` utilities
 - [ ] All tests pass with current Newtonsoft.Json implementation
-- [ ] Tests will serve as regression tests during STJ migration
 
 ---
 
@@ -143,6 +216,7 @@ The ImageBuilder project contains model classes (`Models/Manifest/`, `Models/Ima
 **Description**: Replace Newtonsoft.Json attributes with System.Text.Json attributes in all migrated models (Manifest and Image).
 
 **Prerequisites**:
+- Task 2 completed (all models in ImageBuilder.Models)
 - Task 2.5 completed (Image model serialization tests exist)
 - All serialization tests passing with Newtonsoft.Json
 
@@ -413,13 +487,19 @@ public interface IImageArtifactDetailsLoader
 
 ## Task Dependencies
 
-**Task order**:
-1. Tasks 1 & 2 can be done in parallel (migration phase)
-2. Task 2.5 must follow Task 2 (needs Image models migrated)
-3. Task 3 requires Tasks 1 & 2.5 complete (all models + all serialization tests)
-4. Tasks 4 → 5 are sequential
-5. Tasks 6, 7, 8 can be done in parallel (after Task 5)
-6. Task 9 is the final step
+**Updated Task order** (reflecting discovered blockers):
+1. ✅ Task 1: Migrate Manifest Models - COMPLETE
+2. Task 2a: Migrate BuildCommand to use context
+3. Task 2b: Migrate ImageCacheService to use context
+4. Task 2c: Update ImageData.CompareTo (enables MergeImageInfoCommand migration)
+5. Task 2: Migrate Image Models (after 2a, 2b, 2c complete)
+6. Task 2.5: Add Serialization Tests for Image Models
+7. Task 3: Convert to System.Text.Json (requires Task 2 + 2.5)
+8. Tasks 4 → 5 are sequential
+9. Tasks 6, 7, 8 can be done in parallel (after Task 5)
+10. Task 9 is the final step
+
+**Key Insight**: The ViewModel coupling in Image models requires completing Tasks 2a, 2b, 2c before the Image models can be cleanly migrated. The `ImageArtifactContext` pattern established provides the foundation for this work.
 
 ---
 
@@ -430,7 +510,8 @@ public interface IImageArtifactDetailsLoader
 | Breaking changes to JSON format | High - pipeline failures | Compare serialized output before/after each change |
 | Immutable collections break existing code | Medium | Identify all mutation sites before converting |
 | System.Text.Json behavior differences | Medium | Test edge cases (empty arrays, nulls, defaults) |
-| ViewModel coupling harder to separate than expected | Low | Keep ViewModel in ImageBuilder, use extension methods |
+| ViewModel coupling harder to separate than expected | **Realized** | Created `ImageArtifactContext` pattern to decouple reads; writes still need work |
+| BuildCommand complexity | Medium | Need to maintain context alongside ImageArtifactDetails during build |
 
 ---
 
@@ -440,3 +521,24 @@ public interface IImageArtifactDetailsLoader
 2. **Integration tests**: Load real manifest.json and image-info.json files
 3. **Comparison tests**: Verify JSON output matches between old and new implementations
 4. **Pipeline tests**: Run full build/publish pipeline to verify no regressions
+
+---
+
+## Notes on Implementation
+
+### ImageArtifactContext Pattern
+Created `ImageArtifactContext` class that provides lookup dictionaries to track associations between data models and view models without storing references directly on the data objects.
+
+**Key methods**:
+- `SetPlatformContext(PlatformData, PlatformInfo, ImageInfo)` - Register associations
+- `GetPlatformInfo(PlatformData)` - Lookup PlatformInfo for a given PlatformData
+- `GetImageInfo(ImageData)` - Lookup ImageInfo for a given ImageData
+- `GetRepoInfo(ImageData)` - Lookup RepoInfo for a given ImageData
+- `GetAllTags(PlatformData)` - Get combined shared + platform tags
+
+**New loader methods**:
+- `ImageInfoHelper.LoadFromFileWithContext()` - Returns context with lookups populated
+- `ImageInfoHelper.LoadFromContentWithContext()` - Same, from string content
+
+### Formatting
+Run `dotnet format src/ImageBuilder.Models` for formatting errors. Do NOT run `dotnet format` on the entire ImageBuilder project as it causes too many changes.
