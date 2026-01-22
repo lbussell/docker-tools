@@ -16,7 +16,7 @@ The ImageBuilder project contains model classes (`Models/Manifest/`, `Models/Ima
 
 **Goal**: Enable other repos (e.g., FilePusher, docker-dotnet unit tests) to easily read, query, and edit Manifest and ImageArtifactDetails JSON files with the same results as ImageBuilder.
 
-## Current Progress (2026-01-21)
+## Current Progress (2026-01-22)
 
 ### Completed
 - **Task 1: Manifest Models Migration** - COMPLETE ✅
@@ -25,37 +25,35 @@ The ImageBuilder project contains model classes (`Models/Manifest/`, `Models/Ima
   - Newtonsoft.Json package added to ImageBuilder.Models
   - All 369 tests pass
 
-- **Task 2: Image Models Migration** - PARTIALLY COMPLETE (context foundation)
-  - Created `ImageArtifactContext` class to decouple data models from ViewModels
-  - Added `LoadFromContentWithContext` / `LoadFromFileWithContext` methods
-  - Migrated 6 commands to use context-based lookups:
-    - WaitForMcrImageIngestionCommand
-    - PublishManifestCommand
-    - CopyAcrImagesCommand
-    - IngestKustoImageInfoCommand
-    - PullImagesCommand
-    - PostPublishNotificationCommand
+- **Task 2: Image Models Migration** - COMPLETE ✅
+  - All 6 Image model files moved to `ImageBuilder.Models/Image/`:
+    - `ImageArtifactDetails.cs`, `ImageData.cs`, `PlatformData.cs`
+    - `RepoData.cs`, `ManifestData.cs`, `Layer.cs`
+  - Removed `[JsonIgnore]` ViewModel properties from models
+  - Created `ImageArtifactContext` for tracking ViewModel associations
+  - Created `PlatformDataFactory` for creating PlatformData from ViewModels
+  - Renamed `ImageArtifactDetails.cs` to `ImageArtifactDetailsHelper.cs` in ImageBuilder (keeps FromJson with Layer converter)
+  - Updated all commands to use context-based lookups
+  - Context-aware merge in `MergeImageArtifactDetails`
+  - All 370 tests pass
 
-### Blockers Discovered
-The Image models (`ImageData`, `PlatformData`) have `[JsonIgnore]` properties that reference ViewModel types. These create bidirectional references that are used extensively:
+- **Task 2a: Migrate BuildCommand** - COMPLETE ✅
+- **Task 2b: Migrate ImageCacheService** - COMPLETE ✅  
+- **Task 2c: Update ImageData.CompareTo** - COMPLETE ✅
 
-1. **`BuildCommand`** - Creates NEW `PlatformData` objects and sets `ImageInfo`/`PlatformInfo` on them during build. Uses `PlatformData.FromPlatformInfo()`.
+### Key Architectural Changes
 
-2. **`ImageCacheService`** - Uses `PlatformInfo` for cache key generation and platform matching.
+**ImageArtifactContext Pattern**: Decouples data models from ViewModels by providing lookup dictionaries:
+- `SetPlatformContext(PlatformData, PlatformInfo, ImageInfo)` - Register associations
+- `SetImageContext(ImageData, ImageInfo, RepoInfo)` - Register image associations
+- `GetPlatformInfo(PlatformData)` - Lookup PlatformInfo
+- `GetImageInfo(ImageData)` - Lookup ImageInfo
+- `GetImageInfoForPlatform(PlatformData)` - Lookup ImageInfo for a platform
+- `GetRepoInfo(ImageData)` - Lookup RepoInfo
 
-3. **`MergeImageInfoCommand`** - The merge logic uses `ImageData.CompareTo` which requires `ManifestImage` to be set.
+**Context-Aware Merge**: The `MergeImageArtifactDetails` method now has an overload that accepts contexts, enabling proper image matching during merge operations without relying on ViewModel properties.
 
-4. **`ImageData.CompareTo`** - Throws `InvalidOperationException` if `ManifestImage` is null.
-
-### Solution Approach
-Created `ImageArtifactContext` class that provides:
-- Lookup dictionaries: `PlatformData → PlatformInfo`, `ImageData → ImageInfo`, etc.
-- Methods: `GetPlatformInfo()`, `GetImageInfo()`, `GetRepoInfo()`, `GetAllTags()`, etc.
-- This allows commands that READ image info to use context lookups instead of properties
-
-**Key Insight**: Commands fall into two categories:
-1. **Readers** - Load image info, process it. Can use context (migrated).
-2. **Writers** - Create/modify data during builds. Still need direct property access.
+**PlatformData.GetIdentifier()**: Changed signature from `GetIdentifier(bool excludeProductVersion)` to `GetIdentifier(string? productVersion)` since the model no longer has access to ImageInfo.
 
 ## Scope
 
@@ -109,39 +107,28 @@ Created `ImageArtifactContext` class that provides:
 
 ---
 
-### Task 2: Migrate Image Models to ImageBuilder.Models (BLOCKED)
+### Task 2: Migrate Image Models to ImageBuilder.Models ✅ COMPLETE
 
 **Description**: Move the `Models/Image/` classes from ImageBuilder to ImageBuilder.Models.
 
-**Status**: BLOCKED - ViewModel dependencies cannot be resolved without architectural changes.
+**Files migrated**:
+- `ImageArtifactDetails.cs` - Data only, no FromJson method
+- `ImageData.cs` - No ManifestImage/ManifestRepo properties
+- `PlatformData.cs` - No ImageInfo/PlatformInfo/AllTags properties
+- `RepoData.cs`, `ManifestData.cs`, `Layer.cs` - Unchanged
 
-**Blocker Details**: 
-The Image models have `[JsonIgnore]` properties that reference ViewModel types (ImageInfo, PlatformInfo, RepoInfo, TagInfo). These ViewModel types are in ImageBuilder, so moving the models to ImageBuilder.Models would create a circular dependency (ImageBuilder.Models -> ImageBuilder -> ImageBuilder.Models).
-
-**Options to Resolve**:
-1. **Extract ViewModels** - Move ViewModel types to a separate project that both ImageBuilder and ImageBuilder.Models can reference
-2. **Keep models in ImageBuilder** - Skip migration of Image models and only migrate Manifest models (which don't have ViewModel dependencies)
-3. **Context-only approach** - Remove `[JsonIgnore]` properties from models, requiring ALL code to use ImageArtifactContext
-
-**Recommendation**: Option 3 is preferred long-term, but requires completing migration of remaining commands:
-- MergeImageInfoCommand (uses `ManifestImage` for matching)
-- ImageInfoHelper.LoadFromFile (sets all ViewModel properties)
-- GenerateBuildMatrixCommand (uses `PlatformInfo`)
-
-**Files to migrate** (after ViewModel decoupling):
-- `ImageArtifactDetails.cs`
-- `RepoData.cs`
-- `ImageData.cs`
-- `PlatformData.cs`
-- `ManifestData.cs`
-- `Layer` record (currently in PlatformData.cs)
+**Supporting changes in ImageBuilder**:
+- `ImageArtifactDetailsHelper.cs` - Contains FromJson with custom Layer converter
+- `PlatformDataFactory.cs` - Factory methods for creating PlatformData from ViewModels
+- `ImageArtifactContext.cs` - Tracks ViewModel associations for data models
+- Context-aware `MergeImageArtifactDetails` overload in ImageInfoHelper
 
 **Acceptance Criteria**:
-- [ ] All Image model classes exist in `ImageBuilder.Models` project
-- [ ] Namespace is `Microsoft.DotNet.ImageBuilder.Models.Image`
-- [ ] ImageBuilder compiles with updated references
-- [ ] All ImageBuilder tests pass
-- [ ] `[JsonIgnore]` properties removed from models (ViewModel refs moved to context)
+- [x] All Image model classes exist in `ImageBuilder.Models` project
+- [x] Namespace is `Microsoft.DotNet.ImageBuilder.Models.Image`
+- [x] ImageBuilder compiles with updated references
+- [x] All ImageBuilder tests pass (370 tests)
+- [x] `[JsonIgnore]` properties removed from models (ViewModel refs moved to context)
 
 ---
 
@@ -150,21 +137,15 @@ The Image models have `[JsonIgnore]` properties that reference ViewModel types (
 **Description**: Refactor `BuildCommand` to use the context pattern when creating and tracking `PlatformData` objects during builds.
 
 **Implementation**:
-- Added `_imageArtifactContext` field alongside `_imageArtifactDetails` in BuildCommand
-- `CreatePlatformData()` now registers platforms in context via `SetPlatformContext`
-- Added `GetPlatformInfo()` and `GetImageInfo()` helper methods for context lookups with fallback
-- All usages of `platformData.PlatformInfo` updated to use helper methods
-
-**Approach**:
-- Create a context alongside `_imageArtifactDetails` in BuildCommand
-- Update `CreatePlatformData()` to register new platforms in the context
-- Update code that reads `platform.PlatformInfo` to use context lookups
-- Update `PlatformData.FromPlatformInfo()` to not set ViewModel properties
+- Added `_imageArtifactContext` field - always created alongside `_imageArtifactDetails`
+- `CreatePlatformData()` uses `PlatformDataFactory.FromPlatformInfo()` and registers in context
+- Added `GetPlatformInfo()` and `GetImageInfo()` helper methods for context lookups
+- All usages of ViewModel properties updated to use context
 
 **Acceptance Criteria**:
-- [ ] BuildCommand uses ImageArtifactContext for all ViewModel lookups
-- [ ] New platforms are registered in context when created
-- [ ] All build-related tests pass
+- [x] BuildCommand uses ImageArtifactContext for all ViewModel lookups
+- [x] New platforms are registered in context when created
+- [x] All build-related tests pass
 
 ---
 
@@ -173,10 +154,10 @@ The Image models have `[JsonIgnore]` properties that reference ViewModel types (
 **Description**: Refactor `ImageCacheService` to receive context instead of relying on `PlatformData.PlatformInfo`.
 
 **Implementation**:
-- Added `ImageArtifactContext?` parameter to `CheckForCachedImageAsync` interface and implementation
-- Uses context for PlatformInfo lookups with fallback to direct property
-- Updated BuildCommand to pass `_imageArtifactContext` to CheckForCachedImageAsync
-- Updated GenerateBuildMatrixCommand to pass `context: null`
+- Added `ImageArtifactContext?` parameters to `CheckForCachedImageAsync` (for both current and source)
+- Uses context-only lookups for PlatformInfo (no fallback to properties)
+- Updated BuildCommand to pass `_imageArtifactContext` and source context
+- Updated GenerateBuildMatrixCommand to pass contexts
 - Updated test mocks
 
 **Acceptance Criteria**:
@@ -502,19 +483,19 @@ public interface IImageArtifactDetailsLoader
 
 ## Task Dependencies
 
-**Updated Task order** (reflecting discovered blockers):
+**Updated Task order** (reflecting completed work):
 1. ✅ Task 1: Migrate Manifest Models - COMPLETE
-2. Task 2a: Migrate BuildCommand to use context
-3. Task 2b: Migrate ImageCacheService to use context
-4. Task 2c: Update ImageData.CompareTo (enables MergeImageInfoCommand migration)
-5. Task 2: Migrate Image Models (after 2a, 2b, 2c complete)
+2. ✅ Task 2a: Migrate BuildCommand to use context - COMPLETE
+3. ✅ Task 2b: Migrate ImageCacheService to use context - COMPLETE
+4. ✅ Task 2c: Update ImageData.CompareTo - COMPLETE
+5. ✅ Task 2: Migrate Image Models - COMPLETE
 6. Task 2.5: Add Serialization Tests for Image Models
-7. Task 3: Convert to System.Text.Json (requires Task 2 + 2.5)
+7. Task 3: Convert to System.Text.Json (requires Task 2.5)
 8. Tasks 4 → 5 are sequential
 9. Tasks 6, 7, 8 can be done in parallel (after Task 5)
 10. Task 9 is the final step
 
-**Key Insight**: The ViewModel coupling in Image models requires completing Tasks 2a, 2b, 2c before the Image models can be cleanly migrated. The `ImageArtifactContext` pattern established provides the foundation for this work.
+**Next Steps**: Task 2.5 (serialization tests) or Task 3 (System.Text.Json conversion).
 
 ---
 
@@ -525,8 +506,8 @@ public interface IImageArtifactDetailsLoader
 | Breaking changes to JSON format | High - pipeline failures | Compare serialized output before/after each change |
 | Immutable collections break existing code | Medium | Identify all mutation sites before converting |
 | System.Text.Json behavior differences | Medium | Test edge cases (empty arrays, nulls, defaults) |
-| ViewModel coupling harder to separate than expected | **Realized** | Created `ImageArtifactContext` pattern to decouple reads; writes still need work |
-| BuildCommand complexity | Medium | Need to maintain context alongside ImageArtifactDetails during build |
+| ViewModel coupling harder to separate than expected | **Resolved** | Created `ImageArtifactContext` pattern and context-aware merge |
+| BuildCommand complexity | **Resolved** | Context is always created and maintained alongside ImageArtifactDetails |
 
 ---
 
@@ -546,14 +527,25 @@ Created `ImageArtifactContext` class that provides lookup dictionaries to track 
 
 **Key methods**:
 - `SetPlatformContext(PlatformData, PlatformInfo, ImageInfo)` - Register associations
+- `SetImageContext(ImageData, ImageInfo, RepoInfo)` - Register image associations
 - `GetPlatformInfo(PlatformData)` - Lookup PlatformInfo for a given PlatformData
 - `GetImageInfo(ImageData)` - Lookup ImageInfo for a given ImageData
+- `GetImageInfoForPlatform(PlatformData)` - Lookup ImageInfo for a platform
 - `GetRepoInfo(ImageData)` - Lookup RepoInfo for a given ImageData
 - `GetAllTags(PlatformData)` - Get combined shared + platform tags
 
 **New loader methods**:
 - `ImageInfoHelper.LoadFromFileWithContext()` - Returns context with lookups populated
 - `ImageInfoHelper.LoadFromContentWithContext()` - Same, from string content
+
+### Context-Aware Merge
+The `MergeImageArtifactDetails` method has an overload accepting `ImageArtifactContext` objects for both source and target. This enables:
+- Matching images by their manifest `ImageInfo` reference (same manifest used for all loads)
+- Copying context mappings when repos/images are added to target
+- Proper platform merging across files without ViewModel properties on models
+
+### PlatformDataFactory
+Created `PlatformDataFactory.FromPlatformInfo(PlatformInfo, ImageInfo)` to replace the static method that was on `PlatformData`. This keeps the model clean while providing the same functionality.
 
 ### Formatting
 Run `dotnet format src/ImageBuilder.Models` for formatting errors. Do NOT run `dotnet format` on the entire ImageBuilder project as it causes too many changes.
