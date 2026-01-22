@@ -16,7 +16,7 @@ public class Tag
         "An identifier used to conceptually group related tags in the readme " +
         "documentation."
         )]
-    public string DocumentationGroup { get; set; }
+    public string? DocumentationGroup { get; set; }
 
     [Description(
         "Indicates how this tag should not be documented in the readme file. Regardless of the " +
@@ -29,7 +29,7 @@ public class Tag
 
     [Description(
         "Description of where the tag should be syndicated to.")]
-    public TagSyndication Syndication { get; set; }
+    public TagSyndication? Syndication { get; set; }
 
     public Tag()
     {

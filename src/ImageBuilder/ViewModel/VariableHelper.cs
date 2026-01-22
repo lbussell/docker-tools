@@ -34,7 +34,7 @@ namespace Microsoft.DotNet.ImageBuilder.ViewModel
 
             if (Manifest.Variables is not null)
             {
-                foreach (KeyValuePair<string, string?> kvp in Manifest.Variables)
+                foreach (KeyValuePair<string, string> kvp in Manifest.Variables)
                 {
                     string? variableValue;
                     if (Options.Variables is not null && Options.Variables.TryGetValue(kvp.Key, out string? overridenValue))

@@ -2,6 +2,7 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using Newtonsoft.Json;
@@ -14,7 +15,7 @@ public class Image
     [Description(
         "The set of platforms that describe the platform-specific variations of the Docker image.")]
     [JsonProperty(Required = Required.Always)]
-    public Platform[] Platforms { get; set; }
+    public Platform[] Platforms { get; set; } = null!;
 
     [Description(
         "The set of tags that are shared amongst all platform-specific versions of the image. An " +
@@ -22,10 +23,10 @@ public class Image
         "`docker pull mcr.microsoft.com/dotnet/core/runtime:2.2` on Windows will get the " +
         "default Windows-based tag whereas running it on Linux will get the default " +
         "Linux-based tag.")]
-    public IDictionary<string, Tag> SharedTags { get; set; }
+    public IDictionary<string, Tag>? SharedTags { get; set; }
 
     [Description("The full version of the product that the Docker image contains.")]
-    public string ProductVersion { get; set; }
+    public string? ProductVersion { get; set; }
 
     public Image()
     {

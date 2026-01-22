@@ -18,26 +18,26 @@ public class Repo
         "A unique identifier of the repo. This is purely within the context " +
         "of the manifest and not exposed to Docker in any way."
         )]
-    public string Id { get; set; }
+    public string? Id { get; set; }
 
     [Description(
         "The set of images contained in this repository."
         )]
     [JsonProperty(Required = Required.Always)]
-    public Image[] Images { get; set; }
+    public Image[] Images { get; set; } = null!;
 
     [Description(
         "Relative path to the MCR tags template YAML file that is used by " +
         "tooling to generate the tags section of the readme file."
         )]
-    public string McrTagsMetadataTemplate { get; set; }
+    public string? McrTagsMetadataTemplate { get; set; }
 
     [Description(
         "The name of the Docker repository where the described images are to " +
         "be published (example: dotnet/core/runtime)."
         )]
     [JsonProperty(Required = Required.Always)]
-    public string Name { get; set; }
+    public string Name { get; set; } = null!;
 
     [Description(
         "Info about the readme that documents the repo."

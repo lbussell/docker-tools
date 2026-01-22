@@ -103,7 +103,7 @@ namespace Microsoft.DotNet.ImageBuilder.ViewModel
                         Name = group.Name,
                         Type = group.Type,
                         Dependencies = group.Dependencies
-                            .Select(dependency => VariableHelper.SubstituteValues(dependency))
+                            .Select(dependency => VariableHelper.SubstituteValues(dependency)!)
                             .ToArray()
                     })
                 .ToDictionary(info => info.Name)

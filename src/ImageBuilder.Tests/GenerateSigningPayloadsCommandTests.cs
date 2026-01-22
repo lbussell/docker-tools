@@ -217,7 +217,7 @@ public sealed class GenerateSigningPayloadsCommandTests : IDisposable
                 .Where(manifest => manifest is not null)
                 .Select(manifestList =>
                     new ImageDigestInfo(
-                        Digest: manifestList.Digest,
+                        Digest: manifestList!.Digest,
                         Tags: manifestList.SharedTags,
                         IsManifestList: true));
 

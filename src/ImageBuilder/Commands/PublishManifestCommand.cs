@@ -104,7 +104,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
 
             foreach (ImageData image in images)
             {
-                image.Manifest.Created = createdDate;
+                image.Manifest!.Created = createdDate;
 
                 ImageInfo? manifestImage = context.GetImageInfo(image);
                 RepoInfo? manifestRepo = context.GetRepoInfo(image);
