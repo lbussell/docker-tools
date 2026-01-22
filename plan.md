@@ -209,6 +209,8 @@ The ImageBuilder project contains model classes (`Models/Manifest/`, `Models/Ima
 
 ### Task 3: Convert All Models to System.Text.Json
 
+**Status**: BLOCKED - Requires significant work due to behavioral differences
+
 **Description**: Replace Newtonsoft.Json attributes with System.Text.Json attributes in all migrated models (Manifest and Image).
 
 **Prerequisites**:
@@ -216,44 +218,50 @@ The ImageBuilder project contains model classes (`Models/Manifest/`, `Models/Ima
 - Task 2.5 completed (Image model serialization tests exist)
 - All serialization tests passing with Newtonsoft.Json
 
-**Attribute Changes**:
-- Replace `[JsonProperty(Required = Required.Always)]` with `[JsonRequired]`
-- Replace `[JsonConverter(typeof(StringEnumConverter))]` with `[JsonConverter(typeof(JsonStringEnumConverter))]`
-- Replace `[JsonProperty(DefaultValueHandling = ...)]` with `[JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]`
-- Replace `[JsonProperty(NullValueHandling = NullValueHandling.Ignore)]` with `[JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]`
-- Replace `[JsonIgnore]` with `[JsonIgnore]` (same in STJ)
-- Remove Newtonsoft.Json package reference from ImageBuilder.Models
+**Investigation Findings (2026-01-22)**:
+
+The STJ migration was attempted but has significant behavioral differences that require substantial work:
+
+1. **`[JsonRequired]` behavior differs**: STJ's `[JsonRequired]` only checks if a property is present in JSON, not if it's null. Newtonsoft's `Required = Required.Always` throws for both missing AND null values. The 8 `_Null` tests would need to be removed or completely rewritten.
+
+2. **Default value handling differs**: STJ's `DefaultIgnoreCondition.WhenWritingDefault` uses the type's numeric default (0 for enums), not the `[DefaultValue]` attribute. This requires a custom `TypeInfoResolver` modifier to match Newtonsoft behavior.
+
+3. **Comprehensive migration required**: Both ImageBuilder.Models AND ImageBuilder's JsonHelper must be migrated simultaneously. Having STJ attributes on models while using Newtonsoft for serialization causes a mismatch.
+
+4. **Custom serialization logic needed**: A custom `TypeInfoResolver` modifier is needed to:
+   - Respect `[DefaultValue]` attributes for enums
+   - Skip empty collections for non-required properties
+   - Handle default DateTime values
 
 **Files to update**:
 - All Manifest models: `Manifest.cs`, `Repo.cs`, `Image.cs`, `Platform.cs`, `Tag.cs`, `Readme.cs`, `CustomBuildLegGroup.cs`, `TagSyndication.cs`
 - All Image models: `ImageArtifactDetails.cs`, `RepoData.cs`, `ImageData.cs`, `PlatformData.cs`, `ManifestData.cs`
 
 **Test infrastructure updates**:
-- Update `SerializationHelper.cs` to use System.Text.Json
-- Ensure all existing serialization tests pass with STJ
-- Add any STJ-specific edge case tests if behavior differs
+- Update `SerializationHelper.cs` to use System.Text.Json with custom `JsonSerializerOptions`
+- Remove/update 8-11 tests that rely on Newtonsoft-specific null handling behavior
+- May need to adjust expected JSON outputs for minor formatting differences
 
 **ImageBuilder Changes**:
 - Update `ManifestInfo.LoadModel()` to use `JsonSerializer.Deserialize()`
 - Update `ImageArtifactDetails.FromJson()` to use `JsonSerializer.Deserialize()`
-- Update `JsonHelper` to use System.Text.Json (or create new helper)
+- Update `JsonHelper` to use System.Text.Json
 - Update all serialization call sites
 
 **Acceptance Criteria**:
 - [ ] No Newtonsoft.Json references in ImageBuilder.Models
 - [ ] All models use System.Text.Json attributes
 - [ ] `SerializationHelper.cs` updated to use System.Text.Json
-- [ ] ALL existing serialization tests pass (Manifest + Image models)
+- [ ] ALL existing serialization tests pass (Manifest + Image models) - except `_Null` tests which need updating
 - [ ] JSON serialization output matches previous format (camelCase, ignore nulls, etc.)
 - [ ] Deserialization handles all existing JSON files correctly
 
-**Notes**:
-- The existing serialization tests in `ImageBuilder.Tests/Models/` are the primary regression tests
-- May need custom `JsonSerializerOptions` to match existing behavior:
-  - `PropertyNamingPolicy = JsonNamingPolicy.CamelCase`
-  - `DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull`
-  - Custom converter for empty collection handling
-- The `JsonHelper.SerializeObject()` method in ImageBuilder uses Newtonsoft.Json - needs updating
+**Recommended Approach**:
+1. Create a `JsonSerializerOptionsFactory` in ImageBuilder.Models with properly configured options
+2. Implement custom `TypeInfoResolver` modifier for default value handling
+3. Migrate ImageBuilder's JsonHelper to use the new options
+4. Update tests to reflect STJ behavior for null handling
+5. Run comprehensive integration tests with actual manifest.json files
 
 ---
 
