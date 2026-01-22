@@ -182,7 +182,7 @@ The ImageBuilder project contains model classes (`Models/Manifest/`, `Models/Ima
 
 ---
 
-### Task 2.5: Add Serialization Tests for Image Models
+### Task 2.5: Add Serialization Tests for Image Models ✅ COMPLETE
 
 **Description**: Create comprehensive serialization tests for Image models following the pattern established for Manifest models.
 
@@ -190,20 +190,20 @@ The ImageBuilder project contains model classes (`Models/Manifest/`, `Models/Ima
 - `ManifestSerializationTests.cs`, `PlatformSerializationTests.cs`, etc.
 - `SerializationHelper.cs` for test utilities
 
-**New test files to create**:
-- `ImageArtifactDetailsSerializationTests.cs`
-- `RepoDataSerializationTests.cs`
-- `ImageDataSerializationTests.cs`
-- `PlatformDataSerializationTests.cs`
-- `ManifestDataSerializationTests.cs`
-- `LayerSerializationTests.cs`
+**Test files created**:
+- `Image/ImageArtifactDetailsSerializationTests.cs`
+- `Image/RepoDataSerializationTests.cs`
+- `Image/ImageDataSerializationTests.cs`
+- `Image/PlatformDataSerializationTests.cs`
+- `Image/ManifestDataSerializationTests.cs`
+- `Image/LayerSerializationTests.cs`
 
 **Acceptance Criteria**:
-- [ ] All Image models have serialization tests
-- [ ] Tests cover default, fully-populated, and minimal scenarios
-- [ ] Tests verify required property validation
-- [ ] Tests use `SerializationHelper` utilities
-- [ ] All tests pass with current Newtonsoft.Json implementation
+- [x] All Image models have serialization tests (44 tests)
+- [x] Tests cover default, fully-populated, and minimal scenarios
+- [x] Tests verify required property validation
+- [x] Tests use `SerializationHelper` utilities
+- [x] All tests pass with current Newtonsoft.Json implementation
 
 ---
 
@@ -265,26 +265,27 @@ The STJ migration was attempted but has significant behavioral differences that 
 
 ---
 
-### Task 4: Add Nullable Annotations to All Models
+### Task 4: Add Nullable Annotations to All Models ✅ COMPLETE
 
 **Description**: Enable nullable reference types and add appropriate annotations to all models.
 
 **Changes**:
-- Ensure `<Nullable>enable</Nullable>` in ImageBuilder.Models.csproj (already present)
-- Mark optional properties as nullable (e.g., `string?`)
-- Mark required properties as non-nullable
-- Fix any nullability warnings
-- Remove `#nullable enable/disable` pragmas (use project-wide setting)
+- Enabled `<Nullable>enable</Nullable>` in ImageBuilder.Models.csproj
+- Marked optional properties as nullable (e.g., `string?`)
+- Marked required properties as non-nullable with `= null!` pattern for JSON deserialization
+- Fixed nullability warnings in ImageBuilder code
 
-**Files to update**:
+**Files updated**:
 - All Manifest models
 - All Image models
+- ImageBuilder files with nullable warnings (CopyBaseImagesCommand, PublishManifestCommand, ImageNameResolver, VariableHelper, PlatformInfo)
+- Test file (GenerateSigningPayloadsCommandTests)
 
 **Acceptance Criteria**:
-- [ ] All model properties have correct nullability annotations
-- [ ] No nullable warnings in ImageBuilder.Models
-- [ ] No new nullable warnings in ImageBuilder (or warnings addressed)
-- [ ] All tests pass
+- [x] All model properties have correct nullability annotations
+- [x] No nullable warnings in ImageBuilder.Models
+- [x] No new nullable warnings in ImageBuilder (or warnings addressed)
+- [x] All tests pass (407 tests)
 
 **Manifest Property Analysis**:
 | Class | Property | Nullable? | Reason |
@@ -497,13 +498,22 @@ public interface IImageArtifactDetailsLoader
 3. ✅ Task 2b: Migrate ImageCacheService to use context - COMPLETE
 4. ✅ Task 2c: Update ImageData.CompareTo - COMPLETE
 5. ✅ Task 2: Migrate Image Models - COMPLETE
-6. Task 2.5: Add Serialization Tests for Image Models
-7. Task 3: Convert to System.Text.Json (requires Task 2.5)
-8. Tasks 4 → 5 are sequential
-9. Tasks 6, 7, 8 can be done in parallel (after Task 5)
-10. Task 9 is the final step
+6. ✅ Task 2.5: Add Serialization Tests for Image Models - COMPLETE
+7. ✅ Task 4: Add Nullable Annotations - COMPLETE
+8. ⏸️ Task 3: Convert to System.Text.Json - BLOCKED (requires significant work)
+9. ⏸️ Task 5: Convert to Records with Immutable Collections - BLOCKED (requires Task 3)
+10. Task 6: Create Service Interfaces (can be done now with Newtonsoft.Json)
+11. Task 7: Add Integration Tests (can be done after Task 6)
+12. Task 8: Update ImageBuilder (minimal changes needed)
+13. Task 9: Update NuGet Package Configuration (final step)
 
-**Next Steps**: Task 2.5 (serialization tests) or Task 3 (System.Text.Json conversion).
+**Current Status**: 
+- Models migrated to ImageBuilder.Models with nullable annotations
+- All 407 tests pass
+- Service interfaces (Task 6) can be implemented now
+- STJ migration (Task 3) requires dedicated effort to handle behavioral differences
+
+**Next Steps**: Task 6 (Service Interfaces)
 
 ---
 
