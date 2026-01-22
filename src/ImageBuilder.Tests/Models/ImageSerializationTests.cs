@@ -9,10 +9,12 @@ using Microsoft.DotNet.ImageBuilder.Models.Manifest;
 using Xunit;
 using static Microsoft.DotNet.ImageBuilder.Tests.Models.SerializationHelper;
 
+using ManifestImage = Microsoft.DotNet.ImageBuilder.Models.Manifest.Image;
+
 namespace Microsoft.DotNet.ImageBuilder.Tests.Models;
 
 /// <summary>
-/// Serialization and deserialization tests for <see cref="Image"/> model.
+/// Serialization and deserialization tests for <see cref="ManifestImage"/> model.
 /// These tests ensure that serialization behavior does not change unexpectedly.
 /// </summary>
 public class ImageSerializationTests
@@ -22,15 +24,15 @@ public class ImageSerializationTests
     {
         // A default Image has null Platforms, which violates
         // [JsonProperty(Required = Required.Always)] and cannot be serialized.
-        Image image = new();
+        ManifestImage image = new();
 
-        AssertSerializationFails(image, nameof(Image.Platforms));
+        AssertSerializationFails(image, nameof(ManifestImage.Platforms));
     }
 
     [Fact]
     public void FullyPopulatedImage_Bidirectional()
     {
-        Image image = new()
+        ManifestImage image = new()
         {
             Platforms = [],
             SharedTags = new Dictionary<string, Tag>
@@ -61,7 +63,7 @@ public class ImageSerializationTests
     [Fact]
     public void FullyPopulatedImage_RoundTrip()
     {
-        Image image = new()
+        ManifestImage image = new()
         {
             Platforms = [],
             SharedTags = new Dictionary<string, Tag> { ["8.0"] = new Tag() },
@@ -74,7 +76,7 @@ public class ImageSerializationTests
     [Fact]
     public void MinimalImage_Bidirectional()
     {
-        Image image = new()
+        ManifestImage image = new()
         {
             Platforms = []
         };
@@ -97,7 +99,7 @@ public class ImageSerializationTests
             }
             """;
 
-        AssertDeserializationFails<Image>(json, nameof(Image.Platforms));
+        AssertDeserializationFails<ManifestImage>(json, nameof(ManifestImage.Platforms));
     }
 
     [Fact]
@@ -110,7 +112,7 @@ public class ImageSerializationTests
             }
             """;
 
-        AssertDeserializationFails<Image>(json, nameof(Image.Platforms));
+        AssertDeserializationFails<ManifestImage>(json, nameof(ManifestImage.Platforms));
     }
 
     [Fact]
@@ -122,7 +124,7 @@ public class ImageSerializationTests
             }
             """;
 
-        Image expected = new()
+        ManifestImage expected = new()
         {
             Platforms = [],
             SharedTags = null
@@ -131,7 +133,7 @@ public class ImageSerializationTests
         AssertDeserialization(json, expected, AssertImagesEqual);
     }
 
-    private static void AssertImagesEqual(Image expected, Image actual)
+    private static void AssertImagesEqual(ManifestImage expected, ManifestImage actual)
     {
         Assert.Equal(expected.Platforms?.Length ?? 0, actual.Platforms?.Length ?? 0);
         Assert.Equal(expected.ProductVersion, actual.ProductVersion);
