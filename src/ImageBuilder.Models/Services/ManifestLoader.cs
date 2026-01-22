@@ -3,12 +3,11 @@
 // See the LICENSE file in the project root for more information.
 
 using System.IO;
-using Newtonsoft.Json;
 
 namespace Microsoft.DotNet.ImageBuilder.Models.Services;
 
 /// <summary>
-/// Default implementation of <see cref="IManifestLoader"/> using Newtonsoft.Json.
+/// Default implementation of <see cref="IManifestLoader"/> using System.Text.Json.
 /// </summary>
 public class ManifestLoader : IManifestLoader
 {
@@ -35,6 +34,6 @@ public class ManifestLoader : IManifestLoader
     /// <inheritdoc />
     public string ToJson(Manifest.Manifest manifest)
     {
-        return JsonConvert.SerializeObject(manifest, JsonOptions.SerializerSettings);
+        return JsonOptions.Serialize(manifest);
     }
 }

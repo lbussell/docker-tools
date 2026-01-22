@@ -23,11 +23,13 @@ public class ManifestDataSerializationTests
     {
         ManifestData manifestData = new();
 
-        // DateTime defaults to MinValue which is omitted due to DefaultValueHandling.Ignore
-        // Empty lists are omitted for non-required properties
+        // STJ serializes empty lists and default DateTime values
         string json = """
             {
-              "digest": ""
+              "digest": "",
+              "syndicatedDigests": [],
+              "created": "0001-01-01T00:00:00",
+              "sharedTags": []
             }
             """;
 
@@ -86,10 +88,13 @@ public class ManifestDataSerializationTests
             Digest = "sha256:minimal"
         };
 
-        // Empty lists are omitted, DateTime default is omitted
+        // STJ serializes empty lists and default DateTime values
         string json = """
             {
-              "digest": "sha256:minimal"
+              "digest": "sha256:minimal",
+              "syndicatedDigests": [],
+              "created": "0001-01-01T00:00:00",
+              "sharedTags": []
             }
             """;
 

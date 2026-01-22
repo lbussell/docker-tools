@@ -21,8 +21,12 @@ public class TagSerializationTests
     {
         Tag tag = new();
 
-        // All properties have default/null values, so they are omitted
-        string json = "{}";
+        // STJ serializes default enum values
+        string json = """
+            {
+              "docType": "Documented"
+            }
+            """;
 
         AssertBidirectional(tag, json, AssertTagsEqual);
     }
@@ -47,7 +51,7 @@ public class TagSerializationTests
             }
         };
 
-        // Enums serialize as strings with StringEnumConverter.
+        // STJ serializes default enum values
         string json = """
             {
               "documentationGroup": "test-group",

@@ -4,12 +4,11 @@
 
 using System.IO;
 using Microsoft.DotNet.ImageBuilder.Models.Image;
-using Newtonsoft.Json;
 
 namespace Microsoft.DotNet.ImageBuilder.Models.Services;
 
 /// <summary>
-/// Default implementation of <see cref="IImageArtifactDetailsLoader"/> using Newtonsoft.Json.
+/// Default implementation of <see cref="IImageArtifactDetailsLoader"/> using System.Text.Json.
 /// </summary>
 public class ImageArtifactDetailsLoader : IImageArtifactDetailsLoader
 {
@@ -23,9 +22,8 @@ public class ImageArtifactDetailsLoader : IImageArtifactDetailsLoader
     /// <inheritdoc />
     public ImageArtifactDetails LoadFromJson(string json)
     {
-        return JsonOptions.DeserializeOrThrow<ImageArtifactDetails>(
-            json,
-            JsonOptions.ImageArtifactDetailsDeserializerSettings);
+        // Uses DeserializerOptions which includes the Layer converter
+        return JsonOptions.DeserializeOrThrow<ImageArtifactDetails>(json);
     }
 
     /// <inheritdoc />
@@ -38,6 +36,6 @@ public class ImageArtifactDetailsLoader : IImageArtifactDetailsLoader
     /// <inheritdoc />
     public string ToJson(ImageArtifactDetails details)
     {
-        return JsonConvert.SerializeObject(details, JsonOptions.SerializerSettings);
+        return JsonOptions.Serialize(details);
     }
 }

@@ -163,6 +163,7 @@ public class ImageArtifactDetailsLoaderTests
                                     OsType = "Linux",
                                     OsVersion = "bookworm-slim",
                                     Architecture = "amd64",
+                                    CommitUrl = "https://github.com/dotnet/dotnet-docker/commit/abc123",
                                     Layers =
                                     [
                                         new Layer("sha256:layer1", 1024),
@@ -216,6 +217,7 @@ public class ImageArtifactDetailsLoaderTests
                                     OsType = "Linux",
                                     OsVersion = "bookworm-slim",
                                     Architecture = "amd64",
+                                    CommitUrl = "https://github.com/dotnet/dotnet-docker/commit/abc123",
                                     Layers =
                                     [
                                         new Layer("sha256:layer1", 1024)

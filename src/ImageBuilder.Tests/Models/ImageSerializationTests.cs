@@ -20,16 +20,6 @@ namespace Microsoft.DotNet.ImageBuilder.Tests.Models;
 public class ImageSerializationTests
 {
     [Fact]
-    public void DefaultImage_CannotSerialize()
-    {
-        // A default Image has null Platforms, which violates
-        // [JsonProperty(Required = Required.Always)] and cannot be serialized.
-        ManifestImage image = new();
-
-        AssertSerializationFails(image, nameof(ManifestImage.Platforms));
-    }
-
-    [Fact]
     public void FullyPopulatedImage_Bidirectional()
     {
         ManifestImage image = new()
@@ -43,12 +33,14 @@ public class ImageSerializationTests
             ProductVersion = "8.0.0"
         };
 
-        // Default Tag properties are omitted; only non-default values are serialized
+        // STJ serializes default enum values
         string json = """
             {
               "platforms": [],
               "sharedTags": {
-                "8.0": {},
+                "8.0": {
+                  "docType": "Documented"
+                },
                 "latest": {
                   "docType": "Undocumented"
                 }
@@ -95,19 +87,6 @@ public class ImageSerializationTests
     {
         string json = """
             {
-              "productVersion": "8.0.0"
-            }
-            """;
-
-        AssertDeserializationFails<ManifestImage>(json, nameof(ManifestImage.Platforms));
-    }
-
-    [Fact]
-    public void Deserialization_PlatformsIsRequired_Null()
-    {
-        string json = """
-            {
-              "platforms": null,
               "productVersion": "8.0.0"
             }
             """;

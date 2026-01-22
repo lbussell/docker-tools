@@ -22,10 +22,10 @@ public class ManifestSerializationTests
     {
         Manifest manifest = new();
 
-        // Nulls are omitted; empty Repos array is omitted (IList)
-        // Empty Variables dictionary is NOT omitted (dictionaries are not IList)
+        // STJ serializes empty arrays and dictionaries
         string json = """
             {
+              "repos": [],
               "variables": {}
             }
             """;
@@ -55,7 +55,7 @@ public class ManifestSerializationTests
             }
         };
 
-        // Empty Repos array is omitted (not required)
+        // STJ serializes empty arrays
         string json = """
             {
               "includes": [
@@ -67,6 +67,7 @@ public class ManifestSerializationTests
                 "templatePath": "README.template.md"
               },
               "registry": "mcr.microsoft.com",
+              "repos": [],
               "variables": {
                 "version": "8.0",
                 "osVersion": "jammy"

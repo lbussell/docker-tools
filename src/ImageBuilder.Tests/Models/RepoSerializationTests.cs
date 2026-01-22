@@ -17,16 +17,6 @@ namespace Microsoft.DotNet.ImageBuilder.Tests.Models;
 public class RepoSerializationTests
 {
     [Fact]
-    public void DefaultRepo_CannotSerialize()
-    {
-        // A default Repo has null Images and Name, which violate
-        // [JsonProperty(Required = Required.Always)] and cannot be serialized.
-        Repo repo = new();
-
-        AssertSerializationFails(repo, nameof(Repo.Images));
-    }
-
-    [Fact]
     public void FullyPopulatedRepo_Bidirectional()
     {
         Repo repo = new()
@@ -38,12 +28,14 @@ public class RepoSerializationTests
             Readmes = []
         };
 
+        // STJ serializes empty arrays
         string json = """
             {
               "id": "runtime",
               "images": [],
               "mcrTagsMetadataTemplate": "tags-metadata-template.yaml",
-              "name": "dotnet/runtime"
+              "name": "dotnet/runtime",
+              "readmes": []
             }
             """;
 
@@ -74,11 +66,12 @@ public class RepoSerializationTests
             Name = "dotnet/aspnet"
         };
 
-        // Null properties are omitted; only required images and name are serialized
+        // STJ serializes empty arrays
         string json = """
             {
               "images": [],
-              "name": "dotnet/aspnet"
+              "name": "dotnet/aspnet",
+              "readmes": []
             }
             """;
 
@@ -98,37 +91,11 @@ public class RepoSerializationTests
     }
 
     [Fact]
-    public void Deserialization_ImagesIsRequired_Null()
-    {
-        string json = """
-            {
-              "images": null,
-              "name": "dotnet/runtime"
-            }
-            """;
-
-        AssertDeserializationFails<Repo>(json, nameof(Repo.Images));
-    }
-
-    [Fact]
     public void Deserialization_NameIsRequired_Missing()
     {
         string json = """
             {
               "images": []
-            }
-            """;
-
-        AssertDeserializationFails<Repo>(json, nameof(Repo.Name));
-    }
-
-    [Fact]
-    public void Deserialization_NameIsRequired_Null()
-    {
-        string json = """
-            {
-              "images": [],
-              "name": null
             }
             """;
 

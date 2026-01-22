@@ -24,10 +24,11 @@ public class ImageArtifactDetailsSerializationTests
         ImageArtifactDetails details = new();
 
         // SchemaVersion is always "2.0" (read-only)
-        // Empty Repos list is omitted
+        // STJ serializes empty lists
         string json = """
             {
-              "schemaVersion": "2.0"
+              "schemaVersion": "2.0",
+              "repos": []
             }
             """;
 
@@ -115,6 +116,7 @@ public class ImageArtifactDetailsSerializationTests
                       "productVersion": "8.0.5",
                       "manifest": {
                         "digest": "sha256:manifest1",
+                        "syndicatedDigests": [],
                         "created": "2024-06-15T10:00:00Z",
                         "sharedTags": [
                           "8.0",
@@ -163,7 +165,9 @@ public class ImageArtifactDetailsSerializationTests
                           "osType": "Linux",
                           "osVersion": "jammy",
                           "architecture": "amd64",
-                          "commitUrl": "https://github.com/dotnet/dotnet-docker/commit/def456"
+                          "created": "0001-01-01T00:00:00",
+                          "commitUrl": "https://github.com/dotnet/dotnet-docker/commit/def456",
+                          "layers": []
                         }
                       ]
                     }
@@ -218,10 +222,11 @@ public class ImageArtifactDetailsSerializationTests
         ImageArtifactDetails details = new();
 
         // SchemaVersion should always be "2.0" regardless of input
-        // Empty Repos list is omitted
+        // STJ serializes empty lists
         string json = """
             {
-              "schemaVersion": "2.0"
+              "schemaVersion": "2.0",
+              "repos": []
             }
             """;
 

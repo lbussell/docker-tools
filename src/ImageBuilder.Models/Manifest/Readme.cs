@@ -3,7 +3,7 @@
 // See the LICENSE file in the project root for more information.
 
 using System.ComponentModel;
-using Newtonsoft.Json;
+using System.Text.Json.Serialization;
 
 namespace Microsoft.DotNet.ImageBuilder.Models.Manifest;
 
@@ -15,7 +15,7 @@ public class Readme
             "repository. This readme file documents the set of Docker images for " +
             "this repository."
             )]
-    [JsonProperty(Required = Required.Always)]
+    [JsonRequired]
     public string Path { get; set; } = string.Empty;
 
     [Description(

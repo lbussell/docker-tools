@@ -4,7 +4,7 @@
 
 using System;
 using System.ComponentModel;
-using Newtonsoft.Json;
+using System.Text.Json.Serialization;
 
 namespace Microsoft.DotNet.ImageBuilder.Models.Manifest;
 
@@ -23,7 +23,7 @@ public class Repo
     [Description(
         "The set of images contained in this repository."
         )]
-    [JsonProperty(Required = Required.Always)]
+    [JsonRequired]
     public Image[] Images { get; set; } = null!;
 
     [Description(
@@ -36,7 +36,7 @@ public class Repo
         "The name of the Docker repository where the described images are to " +
         "be published (example: dotnet/core/runtime)."
         )]
-    [JsonProperty(Required = Required.Always)]
+    [JsonRequired]
     public string Name { get; set; } = null!;
 
     [Description(

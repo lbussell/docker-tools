@@ -2,10 +2,9 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
-using System;
 using System.Collections.Generic;
 using System.ComponentModel;
-using Newtonsoft.Json;
+using System.Text.Json.Serialization;
 
 namespace Microsoft.DotNet.ImageBuilder.Models.Manifest;
 
@@ -14,7 +13,7 @@ public class Image
 {
     [Description(
         "The set of platforms that describe the platform-specific variations of the Docker image.")]
-    [JsonProperty(Required = Required.Always)]
+    [JsonRequired]
     public Platform[] Platforms { get; set; } = null!;
 
     [Description(

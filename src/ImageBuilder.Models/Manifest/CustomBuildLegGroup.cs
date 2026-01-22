@@ -4,7 +4,7 @@
 
 using System;
 using System.ComponentModel;
-using Newtonsoft.Json;
+using System.Text.Json.Serialization;
 
 namespace Microsoft.DotNet.ImageBuilder.Models.Manifest;
 
@@ -25,14 +25,15 @@ public class CustomBuildLegGroup
         "Name of the group describing the scenario in which it's relevant. This is just a " +
         " custom label that can then be used by tooling to lookup the group when necessary."
         )]
-    [JsonProperty(Required = Required.Always)]
+    [JsonRequired]
     public string Name { get; set; } = null!;
 
     [Description("The type of the dependency which impacts how it's used during the build.")]
-    [JsonProperty(Required = Required.Always)]
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    [JsonRequired]
     public CustomBuildLegDependencyType Type { get; set; }
 
     [Description("The set of dependencies the image has for this scenario.")]
-    [JsonProperty(Required = Required.Always)]
+    [JsonRequired]
     public string[] Dependencies { get; set; } = Array.Empty<string>();
 }

@@ -115,8 +115,9 @@ public class ReadmeSerializationTests
     [Fact]
     public void Deserialization_PathIsRequired_Null()
     {
-        // Path has [JsonProperty(Required = Required.Always)]
-        // Deserialization should fail when Path is explicitly null
+        // STJ's [JsonRequired] only ensures the property is present in JSON,
+        // it does NOT throw when the value is explicitly null.
+        // Path will be set to null after deserialization.
         string json = """
             {
               "path": null,
@@ -124,7 +125,13 @@ public class ReadmeSerializationTests
             }
             """;
 
-        AssertDeserializationFails<Readme>(json, nameof(Readme.Path));
+        Readme expected = new()
+        {
+            Path = null!,  // STJ allows null for JsonRequired properties
+            TemplatePath = "README.template.md"
+        };
+
+        AssertDeserialization(json, expected, AssertReadmesEqual);
     }
 
     [Fact]

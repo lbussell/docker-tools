@@ -23,19 +23,18 @@ public class PlatformDataSerializationTests
     {
         PlatformData platform = new();
 
-        // Default values for required string properties are empty strings
-        // Empty lists are omitted for non-required properties
-        // BaseImageDigest is null and omitted due to NullValueHandling.Ignore
-        // IsUnchanged is false (default) and omitted due to DefaultValueHandling.Ignore
-        // Created is DateTime.MinValue and omitted due to DefaultValueHandling.Ignore
+        // STJ serializes empty lists and default DateTime values
         string json = """
             {
               "dockerfile": "",
+              "simpleTags": [],
               "digest": "",
               "osType": "",
               "osVersion": "",
               "architecture": "",
-              "commitUrl": ""
+              "created": "0001-01-01T00:00:00",
+              "commitUrl": "",
+              "layers": []
             }
             """;
 
@@ -129,18 +128,18 @@ public class PlatformDataSerializationTests
             CommitUrl = "https://github.com/example/commit"
         };
 
-        // BaseImageDigest is null and omitted
-        // IsUnchanged is false (default) and omitted
-        // Empty SimpleTags and Layers lists are omitted
-        // Created is DateTime.MinValue and omitted
+        // STJ serializes empty lists and default DateTime values
         string json = """
             {
               "dockerfile": "src/Dockerfile",
+              "simpleTags": [],
               "digest": "sha256:minimal",
               "osType": "Linux",
               "osVersion": "jammy",
               "architecture": "amd64",
-              "commitUrl": "https://github.com/example/commit"
+              "created": "0001-01-01T00:00:00",
+              "commitUrl": "https://github.com/example/commit",
+              "layers": []
             }
             """;
 
@@ -162,7 +161,7 @@ public class PlatformDataSerializationTests
             CommitUrl = "https://github.com/dotnet/dotnet-docker/commit/win123"
         };
 
-        // Empty Layers list is omitted
+        // STJ serializes empty lists
         string json = """
             {
               "dockerfile": "src/runtime/8.0/nanoserver-ltsc2022/amd64/Dockerfile",
@@ -174,7 +173,8 @@ public class PlatformDataSerializationTests
               "osVersion": "nanoserver-ltsc2022",
               "architecture": "amd64",
               "created": "2024-06-15T12:00:00Z",
-              "commitUrl": "https://github.com/dotnet/dotnet-docker/commit/win123"
+              "commitUrl": "https://github.com/dotnet/dotnet-docker/commit/win123",
+              "layers": []
             }
             """;
 
@@ -291,17 +291,19 @@ public class PlatformDataSerializationTests
             IsUnchanged = false
         };
 
-        // IsUnchanged should NOT appear in serialized output when false
-        // Empty SimpleTags and Layers lists are also omitted
-        // Created is DateTime.MinValue and omitted
+        // IsUnchanged should NOT appear in serialized output when false (WhenWritingDefault)
+        // STJ serializes empty lists and default DateTime values
         string json = """
             {
               "dockerfile": "src/Dockerfile",
+              "simpleTags": [],
               "digest": "sha256:test",
               "osType": "Linux",
               "osVersion": "jammy",
               "architecture": "amd64",
-              "commitUrl": "https://example.com"
+              "created": "0001-01-01T00:00:00",
+              "commitUrl": "https://example.com",
+              "layers": []
             }
             """;
 
@@ -323,16 +325,18 @@ public class PlatformDataSerializationTests
         };
 
         // IsUnchanged SHOULD appear in serialized output when true
-        // Empty SimpleTags and Layers lists are omitted
-        // Created is DateTime.MinValue and omitted
+        // STJ serializes empty lists and default DateTime values
         string json = """
             {
               "dockerfile": "src/Dockerfile",
+              "simpleTags": [],
               "digest": "sha256:test",
               "osType": "Linux",
               "osVersion": "jammy",
               "architecture": "amd64",
+              "created": "0001-01-01T00:00:00",
               "commitUrl": "https://example.com",
+              "layers": [],
               "isUnchanged": true
             }
             """;

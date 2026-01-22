@@ -15,8 +15,5 @@
     <Description>Core models used by Microsoft.DotNet.ImageBuilder.</Description>
   </PropertyGroup>
 
-  <ItemGroup>
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-  </ItemGroup>
 
 </Project>

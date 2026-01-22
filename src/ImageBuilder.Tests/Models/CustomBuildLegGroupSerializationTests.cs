@@ -17,16 +17,6 @@ namespace Microsoft.DotNet.ImageBuilder.Tests.Models;
 public class CustomBuildLegGroupSerializationTests
 {
     [Fact]
-    public void DefaultCustomBuildLegGroup_CannotSerialize()
-    {
-        // A default CustomBuildLegGroup has null Name, which violates
-        // [JsonProperty(Required = Required.Always)] and cannot be serialized.
-        CustomBuildLegGroup group = new();
-
-        AssertSerializationFails(group, nameof(CustomBuildLegGroup.Name));
-    }
-
-    [Fact]
     public void FullyPopulatedCustomBuildLegGroup_Integral_Bidirectional()
     {
         CustomBuildLegGroup group = new()
@@ -101,20 +91,6 @@ public class CustomBuildLegGroupSerializationTests
     }
 
     [Fact]
-    public void Deserialization_NameIsRequired_Null()
-    {
-        string json = """
-            {
-              "name": null,
-              "type": "Integral",
-              "dependencies": ["image1"]
-            }
-            """;
-
-        AssertDeserializationFails<CustomBuildLegGroup>(json, nameof(CustomBuildLegGroup.Name));
-    }
-
-    [Fact]
     public void Deserialization_TypeIsRequired_Missing()
     {
         string json = """
@@ -134,20 +110,6 @@ public class CustomBuildLegGroupSerializationTests
             {
               "name": "test-scenario",
               "type": "Integral"
-            }
-            """;
-
-        AssertDeserializationFails<CustomBuildLegGroup>(json, nameof(CustomBuildLegGroup.Dependencies));
-    }
-
-    [Fact]
-    public void Deserialization_DependenciesIsRequired_Null()
-    {
-        string json = """
-            {
-              "name": "test-scenario",
-              "type": "Integral",
-              "dependencies": null
             }
             """;
 

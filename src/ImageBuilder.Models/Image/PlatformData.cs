@@ -6,36 +6,35 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
-using Newtonsoft.Json;
+using System.Text.Json.Serialization;
 
 #nullable enable
 namespace Microsoft.DotNet.ImageBuilder.Models.Image;
 
 public class PlatformData : IComparable<PlatformData>
 {
-    [JsonProperty(Required = Required.Always)]
+    [JsonRequired]
     public string Dockerfile { get; set; } = string.Empty;
 
     public List<string> SimpleTags { get; set; } = [];
 
-    [JsonProperty(Required = Required.Always)]
+    [JsonRequired]
     public string Digest { get; set; } = string.Empty;
 
-    [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
     public string? BaseImageDigest { get; set; }
 
-    [JsonProperty(Required = Required.Always)]
+    [JsonRequired]
     public string OsType { get; set; } = string.Empty;
 
-    [JsonProperty(Required = Required.Always)]
+    [JsonRequired]
     public string OsVersion { get; set; } = string.Empty;
 
-    [JsonProperty(Required = Required.Always)]
+    [JsonRequired]
     public string Architecture { get; set; } = string.Empty;
 
     public DateTime Created { get; set; }
 
-    [JsonProperty(Required = Required.Always)]
+    [JsonRequired]
     public string CommitUrl { get; set; } = string.Empty;
 
     public List<Layer> Layers { get; set; } = [];
@@ -47,7 +46,7 @@ public class PlatformData : IComparable<PlatformData>
     /// Items with this state should only be used internally within a build. Such items
     /// should be stripped out of the published image info content.
     /// </remarks>
-    [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public bool IsUnchanged { get; set; }
 
     public int CompareTo([AllowNull] PlatformData other)

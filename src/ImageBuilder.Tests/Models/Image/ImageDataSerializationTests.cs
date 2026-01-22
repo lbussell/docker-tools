@@ -23,10 +23,11 @@ public class ImageDataSerializationTests
     {
         ImageData image = new();
 
-        // ProductVersion and Manifest are null and omitted due to NullValueHandling.Ignore
-        // Empty Platforms list is omitted
+        // STJ serializes empty lists
         string json = """
-            {}
+            {
+              "platforms": []
+            }
             """;
 
         AssertBidirectional(image, json, AssertImageDataEqual);
@@ -76,6 +77,7 @@ public class ImageDataSerializationTests
               "productVersion": "8.0.5",
               "manifest": {
                 "digest": "sha256:manifest123",
+                "syndicatedDigests": [],
                 "created": "2024-06-15T10:00:00Z",
                 "sharedTags": [
                   "8.0",
@@ -93,7 +95,8 @@ public class ImageDataSerializationTests
                   "osVersion": "jammy",
                   "architecture": "amd64",
                   "created": "2024-06-15T09:00:00Z",
-                  "commitUrl": "https://github.com/dotnet/dotnet-docker/commit/abc123"
+                  "commitUrl": "https://github.com/dotnet/dotnet-docker/commit/abc123",
+                  "layers": []
                 },
                 {
                   "dockerfile": "src/runtime/8.0/jammy/arm64v8/Dockerfile",
@@ -105,7 +108,8 @@ public class ImageDataSerializationTests
                   "osVersion": "jammy",
                   "architecture": "arm64",
                   "created": "2024-06-15T09:30:00Z",
-                  "commitUrl": "https://github.com/dotnet/dotnet-docker/commit/def456"
+                  "commitUrl": "https://github.com/dotnet/dotnet-docker/commit/def456",
+                  "layers": []
                 }
               ]
             }
@@ -164,20 +168,21 @@ public class ImageDataSerializationTests
             ]
         };
 
-        // Manifest is null and omitted
-        // Empty SimpleTags and Layers lists are omitted
-        // Created is DateTime.MinValue and omitted
+        // STJ serializes empty lists and default DateTime values
         string json = """
             {
               "productVersion": "8.0.5",
               "platforms": [
                 {
                   "dockerfile": "src/Dockerfile",
+                  "simpleTags": [],
                   "digest": "sha256:single",
                   "osType": "Linux",
                   "osVersion": "jammy",
                   "architecture": "amd64",
-                  "commitUrl": "https://github.com/example/commit"
+                  "created": "0001-01-01T00:00:00",
+                  "commitUrl": "https://github.com/example/commit",
+                  "layers": []
                 }
               ]
             }
@@ -210,12 +215,13 @@ public class ImageDataSerializationTests
             ]
         };
 
-        // ProductVersion is null and omitted
-        // Empty lists and default DateTime values are omitted
+        // STJ serializes empty lists and default DateTime values
         string json = """
             {
               "manifest": {
                 "digest": "sha256:noproductversion",
+                "syndicatedDigests": [],
+                "created": "0001-01-01T00:00:00",
                 "sharedTags": [
                   "latest"
                 ]
@@ -223,11 +229,14 @@ public class ImageDataSerializationTests
               "platforms": [
                 {
                   "dockerfile": "src/Dockerfile",
+                  "simpleTags": [],
                   "digest": "sha256:platform",
                   "osType": "Linux",
                   "osVersion": "jammy",
                   "architecture": "amd64",
-                  "commitUrl": "https://github.com/example/commit"
+                  "created": "0001-01-01T00:00:00",
+                  "commitUrl": "https://github.com/example/commit",
+                  "layers": []
                 }
               ]
             }

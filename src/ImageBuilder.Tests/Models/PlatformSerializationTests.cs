@@ -21,19 +21,18 @@ public class PlatformSerializationTests
     public void DefaultPlatform_Bidirectional()
     {
         // A default Platform can be serialized - it has default values for required properties
-        // Architecture defaults to AMD64 and is omitted due to DefaultValueHandling.IgnoreAndPopulate
         Platform platform = new();
 
-        // Empty BuildArgs dictionary IS serialized (only IList is omitted)
-        // Empty Tags dictionary IS serialized (required)
-        // Empty arrays (CustomBuildLegGroups, Images) are omitted
+        // STJ serializes all properties including defaults (empty arrays, default enums)
         string json = """
             {
+              "architecture": "AMD64",
               "buildArgs": {},
               "dockerfile": "",
               "os": "Linux",
               "osVersion": "",
-              "tags": {}
+              "tags": {},
+              "customBuildLegGroups": []
             }
             """;
 
@@ -64,7 +63,7 @@ public class PlatformSerializationTests
             Variant = "v8"
         };
 
-        // Empty CustomBuildLegGroups is omitted; default Tag properties are omitted
+        // STJ serializes empty arrays; non-default Architecture serialized
         string json = """
             {
               "architecture": "ARM64",
@@ -77,11 +76,14 @@ public class PlatformSerializationTests
               "os": "Linux",
               "osVersion": "jammy",
               "tags": {
-                "8.0-jammy-arm64v8": {},
+                "8.0-jammy-arm64v8": {
+                  "docType": "Documented"
+                },
                 "8.0": {
                   "docType": "Undocumented"
                 }
               },
+              "customBuildLegGroups": [],
               "variant": "v8"
             }
             """;
@@ -120,18 +122,20 @@ public class PlatformSerializationTests
             Tags = new Dictionary<string, Tag> { ["8.0"] = new Tag() }
         };
 
-        // Architecture defaults to AMD64 and is not serialized due to DefaultValueHandling.IgnoreAndPopulate
-        // Empty dictionaries ARE serialized (only IList is omitted)
-        // Empty CustomBuildLegGroups array is omitted; default Tag properties are omitted
+        // STJ serializes default enum values and empty arrays
         string json = """
             {
+              "architecture": "AMD64",
               "buildArgs": {},
               "dockerfile": "src/Dockerfile",
               "os": "Linux",
               "osVersion": "jammy",
               "tags": {
-                "8.0": {}
-              }
+                "8.0": {
+                  "docType": "Documented"
+                }
+              },
+              "customBuildLegGroups": []
             }
             """;
 
@@ -150,18 +154,20 @@ public class PlatformSerializationTests
             Tags = new Dictionary<string, Tag> { ["8.0-nanoserver-ltsc2022"] = new Tag() }
         };
 
-        // Architecture is AMD64 (default) so it's omitted
-        // Empty BuildArgs dictionary IS serialized (only IList is omitted)
-        // Empty CustomBuildLegGroups array is omitted; default Tag properties are omitted
+        // STJ serializes default enum values and empty arrays
         string json = """
             {
+              "architecture": "AMD64",
               "buildArgs": {},
               "dockerfile": "src/runtime/8.0/nanoserver-ltsc2022/amd64/Dockerfile",
               "os": "Windows",
               "osVersion": "nanoserver-ltsc2022",
               "tags": {
-                "8.0-nanoserver-ltsc2022": {}
-              }
+                "8.0-nanoserver-ltsc2022": {
+                  "docType": "Documented"
+                }
+              },
+              "customBuildLegGroups": []
             }
             """;
 
@@ -227,6 +233,8 @@ public class PlatformSerializationTests
     [Fact]
     public void Deserialization_TagsIsRequired_Null()
     {
+        // STJ's [JsonRequired] only ensures the property is present in JSON,
+        // it does NOT throw when the value is explicitly null.
         string json = """
             {
               "dockerfile": "src/Dockerfile",
@@ -236,7 +244,15 @@ public class PlatformSerializationTests
             }
             """;
 
-        AssertDeserializationFails<Platform>(json, nameof(Platform.Tags));
+        Platform expected = new()
+        {
+            Dockerfile = "src/Dockerfile",
+            OS = OS.Linux,
+            OsVersion = "jammy",
+            Tags = null!  // STJ allows null for JsonRequired properties
+        };
+
+        AssertDeserialization(json, expected, AssertPlatformsEqual);
     }
 
     [Fact]

@@ -5,8 +5,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Converters;
+using System.Text.Json.Serialization;
 
 #nullable enable
 namespace Microsoft.DotNet.ImageBuilder.Models.Manifest;
@@ -19,9 +18,7 @@ public class Platform
     [Description(
         "The processor architecture associated with the image."
         )]
-    [DefaultValue(Architecture.AMD64)]
-    [JsonConverter(typeof(StringEnumConverter))]
-    [JsonProperty(DefaultValueHandling = DefaultValueHandling.IgnoreAndPopulate)]
+    [JsonConverter(typeof(JsonStringEnumConverter))]
     public Architecture Architecture { get; set; } = Architecture.AMD64;
 
     [Description(
@@ -33,7 +30,7 @@ public class Platform
         "Relative path to the associated Dockerfile. This can be a file or a " +
         "directory. If it is a directory, the file name defaults to Dockerfile."
         )]
-    [JsonProperty(Required = Required.Always)]
+    [JsonRequired]
     public string Dockerfile { get; set; } = string.Empty;
 
     [Description(
@@ -44,21 +41,21 @@ public class Platform
     [Description(
         "The generic name of the operating system associated with the image."
         )]
-    [JsonConverter(typeof(StringEnumConverter))]
-    [JsonProperty(Required = Required.Always)]
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    [JsonRequired]
     public OS OS { get; set; }
 
     [Description(
         "The specific version of the operating system associated with the image. " +
         "Examples: alpine3.9, bionic, nanoserver-1903."
         )]
-    [JsonProperty(Required = Required.Always)]
+    [JsonRequired]
     public string OsVersion { get; set; } = string.Empty;
 
     [Description(
         "The set of platform-specific tags associated with the image."
         )]
-    [JsonProperty(Required = Required.Always)]
+    [JsonRequired]
     public IDictionary<string, Tag> Tags { get; set; } = new Dictionary<string, Tag>();
 
     [Description(

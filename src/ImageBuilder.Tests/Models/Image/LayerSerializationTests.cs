@@ -42,12 +42,13 @@ public class LayerSerializationTests
     [Fact]
     public void Layer_ZeroSize_Bidirectional()
     {
-        // Size of 0 is the default value and is omitted due to DefaultValueHandling.Ignore
+        // Size of 0 is the default value; STJ still serializes it
         Layer layer = new("sha256:empty", 0);
 
         string json = """
             {
-              "digest": "sha256:empty"
+              "digest": "sha256:empty",
+              "size": 0
             }
             """;
 

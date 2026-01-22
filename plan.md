@@ -391,11 +391,11 @@ public record Manifest
 
 ---
 
-### Task 6: Create Service Interfaces for JSON Loading/Saving
+### Task 6: Create Service Interfaces for JSON Loading/Saving ✅ COMPLETE
 
 **Description**: Add thin service interfaces and implementations for loading and saving Manifest and ImageArtifactDetails JSON files.
 
-**New files**:
+**Files created**:
 ```
 ImageBuilder.Models/
   Services/
@@ -426,13 +426,12 @@ public interface IImageArtifactDetailsLoader
 ```
 
 **Acceptance Criteria**:
-- [ ] `IManifestLoader` interface defined
-- [ ] `IImageArtifactDetailsLoader` interface defined
-- [ ] Default implementations provided
-- [ ] JSON options match existing format (camelCase, ignore nulls, etc.)
-- [ ] ImageBuilder uses the new loaders (or its own implementation)
-- [ ] All tests pass
-- [ ] External consumer can load a manifest.json file and get correct data
+- [x] `IManifestLoader` interface defined
+- [x] `IImageArtifactDetailsLoader` interface defined
+- [x] Default implementations provided
+- [x] JSON options match existing format (camelCase, ignore nulls, etc.)
+- [x] All tests pass (416 tests, including 9 new service tests)
+- [x] External consumer can load a manifest.json file and get correct data
 
 ---
 

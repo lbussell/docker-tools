@@ -3,12 +3,9 @@
 // See the LICENSE file in the project root for more information.
 
 using System;
-using System.Collections;
-using System.Reflection;
 using System.Runtime.Serialization;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
-using Newtonsoft.Json.Serialization;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.DotNet.ImageBuilder.Models.Image;
 
 namespace Microsoft.DotNet.ImageBuilder.Models.Services;
@@ -19,80 +16,48 @@ namespace Microsoft.DotNet.ImageBuilder.Models.Services;
 public static class JsonOptions
 {
     /// <summary>
-    /// Gets the default serializer settings for serializing models to JSON.
-    /// Uses camelCase naming, ignores null/default values, and handles empty lists.
+    /// Gets the default serializer options for serializing models to JSON.
+    /// Uses camelCase naming for properties and preserves original case for enums.
     /// </summary>
-    public static JsonSerializerSettings SerializerSettings => new()
+    public static JsonSerializerOptions SerializerOptions { get; } = new()
     {
-        ContractResolver = new CustomContractResolver(),
-        Formatting = Formatting.Indented,
-        NullValueHandling = NullValueHandling.Ignore,
-        DefaultValueHandling = DefaultValueHandling.Ignore
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        WriteIndented = true,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        Converters = { new JsonStringEnumConverter() }  // No naming policy = preserve original case
     };
 
     /// <summary>
-    /// Gets the deserializer settings for loading ImageArtifactDetails, including
-    /// backward-compatible Layer conversion (schema version 1 → version 2).
+    /// Gets the deserializer options for loading models from JSON.
+    /// Includes backward-compatible Layer conversion (schema version 1 → version 2).
     /// </summary>
-    public static JsonSerializerSettings ImageArtifactDetailsDeserializerSettings => new()
+    public static JsonSerializerOptions DeserializerOptions { get; } = new()
     {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        PropertyNameCaseInsensitive = true,
         Converters =
-        [
+        {
+            new JsonStringEnumConverter(),  // No naming policy = case-insensitive read
             new SchemaVersion2LayerConverter()
-        ]
+        }
     };
 
     /// <summary>
     /// Deserializes JSON to the specified type, throwing a <see cref="SerializationException"/> if null.
     /// </summary>
-    public static T DeserializeOrThrow<T>(string json, JsonSerializerSettings? settings = null)
+    public static T DeserializeOrThrow<T>(string json, JsonSerializerOptions? options = null)
     {
-        return JsonConvert.DeserializeObject<T>(json, settings)
+        return JsonSerializer.Deserialize<T>(json, options ?? DeserializerOptions)
             ?? throw new SerializationException(
                 $"Failed to deserialize {typeof(T).Name}. JSON content was empty or null.");
     }
 
-    private class CustomContractResolver : DefaultContractResolver
+    /// <summary>
+    /// Serializes an object to JSON.
+    /// </summary>
+    public static string Serialize<T>(T value, JsonSerializerOptions? options = null)
     {
-        public CustomContractResolver()
-        {
-            NamingStrategy = new CamelCaseNamingStrategy();
-        }
-
-        protected override JsonProperty CreateProperty(MemberInfo member, MemberSerialization memberSerialization)
-        {
-            JsonProperty property = base.CreateProperty(member, memberSerialization);
-
-            // Required properties should always be serialized (even if default/empty)
-            // Let JSON.NET's Required validation handle null checking
-            if (property.Required == Required.Always)
-            {
-                property.NullValueHandling = NullValueHandling.Include;
-                property.DefaultValueHandling = DefaultValueHandling.Include;
-            }
-            else
-            {
-                // Skip empty lists for non-required properties
-                Predicate<object>? originalShouldSerialize = property.ShouldSerialize;
-                property.ShouldSerialize = targetObj =>
-                {
-                    if (originalShouldSerialize is not null && !originalShouldSerialize(targetObj))
-                    {
-                        return false;
-                    }
-
-                    return !IsEmptyList(property, targetObj);
-                };
-            }
-
-            return property;
-        }
-
-        private static bool IsEmptyList(JsonProperty property, object targetObj)
-        {
-            var propertyValue = property.ValueProvider?.GetValue(targetObj);
-            return propertyValue is IList list && list.Count == 0;
-        }
+        return JsonSerializer.Serialize(value, options ?? SerializerOptions);
     }
 
     /// <summary>
@@ -100,53 +65,51 @@ public static class JsonOptions
     /// Schema version 1 stored layers as strings (digest only).
     /// Schema version 2 stores layers as objects with Digest and Size.
     /// </summary>
-    private class SchemaVersion2LayerConverter : JsonConverter
+    private class SchemaVersion2LayerConverter : JsonConverter<Layer>
     {
-        private static readonly JsonSerializer s_jsonSerializer =
-            JsonSerializer.Create(SerializerSettings);
-
-        // We do not want to handle writing at all. We only want to convert
-        // the old Layer format to the new format, and all writing should be
-        // done using the new format (via the default conversion settings).
-        public override bool CanWrite => false;
-
-        public override bool CanConvert(Type objectType) => objectType == typeof(Layer);
-
-        public override object? ReadJson(
-            JsonReader reader,
-            Type objectType,
-            object? existingValue,
-            JsonSerializer serializer)
+        public override Layer? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
-            JToken token = JToken.Load(reader);
-            return token.Type switch
+            return reader.TokenType switch
             {
-                // If the token is an object, proceed as normal.
-                // We can't use the JsonSerializer passed into the method since
-                // it contains this converter. Doing so would cause a stack
-                // overflow since this method would be called again recursively.
-                JTokenType.Object => token.ToObject<Layer>(s_jsonSerializer),
+                // If the token is an object, deserialize as Layer (pass options for camelCase mapping)
+                JsonTokenType.StartObject => DeserializeLayerObject(ref reader, options),
 
-                // If we encounter a string, we want to convert it to the Layer
-                // object defined in schema version 2. Assume a size of 0. The
-                // next time an image is built, the size will be updated.
-                JTokenType.String =>
+                // If we encounter a string, convert to Layer with size 0
+                JsonTokenType.String =>
                     new Layer(
-                        Digest: token.Value<string>()
-                            ?? throw new JsonSerializationException(
-                                $"Unable to serialize digest from '{token}'"),
+                        Digest: reader.GetString()
+                            ?? throw new JsonException("Unable to read digest string"),
                         Size: 0),
 
-                // Handle null and other token types
-                JTokenType.Null => null,
-                _ => throw new JsonSerializationException(
-                        $"Unexpected token type: {token.Type} when parsing Layer.")
+                // Handle null
+                JsonTokenType.Null => null,
+
+                _ => throw new JsonException($"Unexpected token type: {reader.TokenType} when parsing Layer.")
             };
         }
 
-        public override void WriteJson(JsonWriter writer, object? value, JsonSerializer serializer)
+        private static Layer? DeserializeLayerObject(ref Utf8JsonReader reader, JsonSerializerOptions options)
         {
-            throw new NotImplementedException();
+            // Create new options without this converter to avoid infinite recursion
+            var innerOptions = new JsonSerializerOptions(options);
+            innerOptions.Converters.Clear();
+            foreach (var converter in options.Converters)
+            {
+                if (converter is not SchemaVersion2LayerConverter)
+                {
+                    innerOptions.Converters.Add(converter);
+                }
+            }
+            return JsonSerializer.Deserialize<Layer>(ref reader, innerOptions);
+        }
+
+        public override void Write(Utf8JsonWriter writer, Layer value, JsonSerializerOptions options)
+        {
+            // Write as object format (schema version 2)
+            writer.WriteStartObject();
+            writer.WriteString("digest", value.Digest);
+            writer.WriteNumber("size", value.Size);
+            writer.WriteEndObject();
         }
     }
 }

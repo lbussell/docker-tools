@@ -2,16 +2,15 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
-using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
-using Newtonsoft.Json;
+using System.Text.Json.Serialization;
 
 namespace Microsoft.DotNet.ImageBuilder.Models.Image;
 
 public class RepoData : IComparable<RepoData>
 {
-    [JsonProperty(Required = Required.Always)]
+    [JsonRequired]
     public string Repo { get; set; } = string.Empty;
 
     public List<ImageData> Images { get; set; } = [];

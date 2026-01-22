@@ -23,11 +23,11 @@ public class RepoDataSerializationTests
     {
         RepoData repo = new();
 
-        // Repo defaults to empty string (required, so included)
-        // Empty Images list is omitted
+        // STJ serializes empty lists
         string json = """
             {
-              "repo": ""
+              "repo": "",
+              "images": []
             }
             """;
 
@@ -95,7 +95,9 @@ public class RepoDataSerializationTests
                       "osType": "Linux",
                       "osVersion": "jammy",
                       "architecture": "amd64",
-                      "commitUrl": "https://github.com/dotnet/dotnet-docker/commit/abc123"
+                      "created": "0001-01-01T00:00:00",
+                      "commitUrl": "https://github.com/dotnet/dotnet-docker/commit/abc123",
+                      "layers": []
                     }
                   ]
                 },
@@ -111,7 +113,9 @@ public class RepoDataSerializationTests
                       "osType": "Linux",
                       "osVersion": "jammy",
                       "architecture": "amd64",
-                      "commitUrl": "https://github.com/dotnet/dotnet-docker/commit/def456"
+                      "created": "0001-01-01T00:00:00",
+                      "commitUrl": "https://github.com/dotnet/dotnet-docker/commit/def456",
+                      "layers": []
                     }
                   ]
                 }
@@ -160,10 +164,11 @@ public class RepoDataSerializationTests
             Repo = "dotnet/sdk"
         };
 
-        // Empty Images list is omitted
+        // STJ serializes empty lists
         string json = """
             {
-              "repo": "dotnet/sdk"
+              "repo": "dotnet/sdk",
+              "images": []
             }
             """;
 
@@ -185,6 +190,8 @@ public class RepoDataSerializationTests
     [Fact]
     public void Deserialization_RepoIsRequired_Null()
     {
+        // STJ's [JsonRequired] only ensures the property is present in JSON,
+        // it does NOT throw when the value is explicitly null.
         string json = """
             {
               "repo": null,
@@ -192,7 +199,13 @@ public class RepoDataSerializationTests
             }
             """;
 
-        AssertDeserializationFails<RepoData>(json, nameof(RepoData.Repo));
+        RepoData expected = new()
+        {
+            Repo = null!,  // STJ allows null for JsonRequired properties
+            Images = []
+        };
+
+        AssertDeserialization(json, expected, AssertRepoDataEqual);
     }
 
     private static void AssertRepoDataEqual(RepoData expected, RepoData actual)

@@ -6,16 +6,13 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
-using Newtonsoft.Json;
 
 namespace Microsoft.DotNet.ImageBuilder.Models.Image;
 
 public class ImageData : IComparable<ImageData>
 {
-    [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
     public string? ProductVersion { get; set; }
 
-    [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
     public ManifestData? Manifest { get; set; }
 
     public List<PlatformData> Platforms { get; set; } = [];
