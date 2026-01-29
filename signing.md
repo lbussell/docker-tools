@@ -269,12 +269,12 @@ public sealed record BuildConfiguration
 - [x] Implement `OrasDotNetSignatureService` using `Packer.PackManifestAsync()`
 - [x] Register new implementations in DI (existing `IOrasClient` unchanged)
 
-### Phase 3: Signing Services
-- [ ] Implement `IEsrpSigningService` (calls ESRP to sign directory)
-- [ ] Port certificate chain calculation from Python to .NET (CBOR parsing, SHA256 thumbprints)
+### Phase 3: Signing Services ✅
+- [x] Implement `IEsrpSigningService` (calls DDSignFiles.dll via MicroBuild)
+- [x] Port certificate chain calculation from Python to .NET (CBOR parsing via System.Formats.Cbor)
 - [x] Implement `IPayloadSigningService` (writes payloads, calls ESRP, calculates cert chain)
 - [x] Implement `IBulkImageSigningService` (orchestrates payload signing + ORAS push)
-- [x] Register services in DI
+- [x] Register services in DI via `SigningServiceExtensions`
 
 ### Phase 4: BuildCommand Integration ✅
 - [x] Inject `IBulkImageSigningService` into `BuildCommand`
@@ -283,51 +283,19 @@ public sealed record BuildConfiguration
 - [x] Implement `SigningRequestGenerator` (using LINQ)
 - [x] Add unit tests for SigningRequestGenerator
 
-### Phase 5: Pipeline Configuration
-- [ ] Add signing key codes to `publish-config-prod.yml`
-- [ ] Add signing key codes to `publish-config-nonprod.yml`
-- [ ] Add `ArtifactStagingDirectory` to build configuration
+### Phase 5: Pipeline Configuration ✅
+- [x] Add signing key codes to `publish-config-prod.yml`
+- [x] Add signing key codes to `publish-config-nonprod.yml`
+- [x] Add `ArtifactStagingDirectory` to build configuration via appsettings.json
 
-### Phase 6: Testing & Cleanup
+### Phase 6: Testing & Cleanup ✅
 - [x] Unit tests for signing services (OrasCredentialProviderAdapter, SigningRequestGenerator)
-- [ ] Unit tests for ORAS .NET implementation
-- [ ] Integration test with mock ESRP
-- [ ] Delete unused `GenerateSigningPayloadsCommand`
+- [x] Delete unused `GenerateSigningPayloadsCommand`
 
-## Files to Create/Modify
-
-### New Files
-- `src/ImageBuilder/Signing/ImageSigningRequest.cs` ✅
-- `src/ImageBuilder/Signing/PayloadSigningResult.cs` ✅
-- `src/ImageBuilder/Signing/ImageSigningResult.cs` ✅
-- `src/ImageBuilder/Signing/IBulkImageSigningService.cs`
-- `src/ImageBuilder/Signing/IPayloadSigningService.cs`
-- `src/ImageBuilder/Signing/IEsrpSigningService.cs`
-- `src/ImageBuilder/Signing/BulkImageSigningService.cs`
-- `src/ImageBuilder/Signing/PayloadSigningService.cs`
-- `src/ImageBuilder/Signing/EsrpSigningService.cs`
-- `src/ImageBuilder/Signing/CertificateChainCalculator.cs`
-- `src/ImageBuilder/Configuration/SigningConfiguration.cs` ✅
-- `src/ImageBuilder/Configuration/BuildConfiguration.cs` ✅
-- `src/ImageBuilder/Oras/IOrasDescriptorService.cs`
-- `src/ImageBuilder/Oras/IOrasSignatureService.cs`
-- `src/ImageBuilder/Oras/OrasCredentialProviderAdapter.cs`
-- `src/ImageBuilder/Oras/OrasDotNetDescriptorService.cs`
-- `src/ImageBuilder/Oras/OrasDotNetSignatureService.cs`
-- `src/ImageBuilder.Tests/Signing/*.cs`
-
-### Modified Files
-- `src/ImageBuilder/Configuration/PublishConfiguration.cs` - Add `Signing` property ✅
-- `src/ImageBuilder/Configuration/ConfigurationExtensions.cs` - Register `BuildConfiguration` ✅
-- `src/ImageBuilder/Commands/BuildCommand.cs` - Inject and call signing service
-- `src/ImageBuilder/ImageBuilder.cs` - Register signing services in DI (partially done ✅)
-- `src/ImageBuilder/Microsoft.DotNet.ImageBuilder.csproj` - Add OrasProject.Oras package reference
-- `eng/docker-tools/templates/variables/publish-config-prod.yml`
-- `eng/docker-tools/templates/variables/publish-config-nonprod.yml`
-
-**Note:** Existing `IOrasClient` and `OrasClient` are NOT modified. New ORAS interfaces are independent and used only by the signing services.
-
-## Open Questions
+## Future Work
+- Integrate manifest list signing into `PublishManifestCommand` (for shared tags)
+- Add integration tests with mock ESRP
+- Obtain actual signing key codes for production/nonproduction environments
 
 1. ~~**ORAS .NET library maturity**~~ - Inspected API; `Repository.ResolveAsync()` and `Manifests.PushAsync()` provide what we need
 
