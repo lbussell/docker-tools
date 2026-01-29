@@ -82,7 +82,7 @@ The ORAS .NET library is unproven, so maintaining a CLI fallback provides a safe
 | **Bulk operations over single-item** | ESRP signing service accepts a directory of files and signs them all. This is more efficient than signing one file at a time. |
 | **File I/O is synchronous** | Payload files are tiny. Async overhead is unnecessary. Only external service calls are async. |
 | **`FileInfo` for signed payloads** | Avoids primitive obsession. ESRP modifies files in-place, so file references are natural. Stream/byte[] would require re-reading. |
-| **`SigningKeyCode` as enum** | Three fixed key codes (Images, Referrers, Test) that map to certificates on the ESRP backend. Enum provides type safety. |
+| **`SigningKeyCode` as int from config** | Certificate IDs are integers passed directly to DDSignFiles.dll. Config-driven, no enum mapping needed. |
 | **Certificate chain calculated internally** | The chain (in `io.cncf.notary.x509chain.thumbprint#S256` format per Notary v2 spec) is computed by `IPayloadSigningService`, not returned by ESRP. |
 | **`IPayloadSigningService` as abstraction point** | If we need to support different signing backends in the future, this is the interface to swap implementations. `IEsrpSigningService` is specific to our current infrastructure. |
 | **Interface segregation for ORAS** | Different operations have different consumers; easier to mock/test |
@@ -120,13 +120,6 @@ using Microsoft.DotNet.ImageBuilder.Models.Notary;
 
 namespace Microsoft.DotNet.ImageBuilder.Signing;
 
-enum SigningKeyCode
-{
-    Images,
-    Referrers,
-    Test
-}
-
 sealed record ImageSigningRequest(
     // Full tag/reference to manifest or manifest list.
     string ImageName,
@@ -161,7 +154,7 @@ interface IBulkImageSigningService
     // 3. Return ImageSigningResult with signature digests
     Task<IReadOnlyList<ImageSigningResult>> SignImagesAsync(
         IEnumerable<ImageSigningRequest> requests,
-        SigningKeyCode keyCode,
+        int signingKeyCode,
         CancellationToken cancellationToken = default);
 }
 
@@ -174,16 +167,17 @@ interface IPayloadSigningService
     // 4. Return results
     Task<IReadOnlyList<PayloadSigningResult>> SignPayloadsAsync(
         IEnumerable<ImageSigningRequest> requests,
-        SigningKeyCode keyCode,
+        int signingKeyCode,
         CancellationToken cancellationToken = default);
 }
 
 interface IEsrpSigningService
 {
-    // Signs all files in directory in-place using ESRP infrastructure.
+    // Signs all files in directory in-place using DDSignFiles.dll via MicroBuild plugin.
+    // Generates sign list JSON, invokes DDSignFiles.dll, cleans up temp files.
     Task SignDirectoryAsync(
         DirectoryInfo directory,
-        SigningKeyCode keyCode,
+        int signingKeyCode,
         CancellationToken cancellationToken = default);
 }
 ```
@@ -194,8 +188,10 @@ interface IEsrpSigningService
 // Add Signing property to existing PublishConfiguration
 public sealed record SigningConfiguration
 {
-    public SigningKeyCode ImageSigningKeyCode { get; set; }
-    public SigningKeyCode ReferrerSigningKeyCode { get; set; }
+    // Certificate ID used by DDSignFiles.dll for signing container images
+    public int ImageSigningKeyCode { get; set; }
+    // Certificate ID used by DDSignFiles.dll for signing referrer artifacts (SBOMs, etc.)
+    public int ReferrerSigningKeyCode { get; set; }
 }
 
 // New top-level configuration section
@@ -209,9 +205,8 @@ public sealed record BuildConfiguration
 ## Implementation Plan
 
 ### Phase 1: Configuration & Models
-- [ ] Add `SigningKeyCode` enum (Images, Referrers, Test)
 - [ ] Add signing request/result records to Models project
-- [ ] Add `SigningConfiguration` record with `ImageSigningKeyCode`, `ReferrerSigningKeyCode`
+- [ ] Add `SigningConfiguration` record with `ImageSigningKeyCode` (int), `ReferrerSigningKeyCode` (int)
 - [ ] Add `Signing` property to `PublishConfiguration`
 - [ ] Add `BuildConfiguration` record with `ArtifactStagingDirectory`
 - [ ] Add `BuildConfiguration` to DI via Options pattern
@@ -248,7 +243,6 @@ public sealed record BuildConfiguration
 ## Files to Create/Modify
 
 ### New Files
-- `src/ImageBuilder/Signing/SigningKeyCode.cs`
 - `src/ImageBuilder/Signing/ImageSigningRequest.cs`
 - `src/ImageBuilder/Signing/PayloadSigningResult.cs`
 - `src/ImageBuilder/Signing/ImageSigningResult.cs`
@@ -278,7 +272,27 @@ public sealed record BuildConfiguration
 ## Open Questions
 
 1. **ORAS .NET library maturity** - Need to evaluate if it supports all required operations (manifest fetch, signature push)
-2. **ESRP integration details** - Exact command/API for directory signing
+
+## ESRP Integration (DDSignFiles.dll)
+
+ESRP signing uses `DDSignFiles.dll` from the MicroBuild signing plugin.
+
+**Invocation:**
+```
+dotnet --roll-forward major <MBSIGN_APPFOLDER>/DDSignFiles.dll -- /filelist:<path> /signType:<real|test>
+```
+
+**Key details:**
+- `MBSIGN_APPFOLDER` environment variable points to the MicroBuild plugin install location
+- Sign list is a JSON file listing files to sign and certificate IDs
+- `signType: test` only works on Windows
+- Files are signed in-place
+
+**Implementation notes from reference (`microbuild-signing.md`):**
+- Generate sign list JSON with file paths and certificate IDs
+- Write to temp file, clean up after signing
+- Handle exit code for error reporting
+- Consider dry-run behavior (test signing vs skip on non-Windows)
 
 ## Certificate Chain Calculation
 
