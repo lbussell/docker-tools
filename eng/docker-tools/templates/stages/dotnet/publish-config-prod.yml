@@ -107,6 +107,6 @@ stages:
           tenantId: $(publish.serviceConnection.tenantId)
 
       Signing:
-        ImageSigningKeyCode: $(signing.imageKeyCode)
-        ReferrerSigningKeyCode: $(signing.referrerKeyCode)
+        ImageSigningKeyCode: $(microBuildSigningKeyCode.containers)
+        ReferrerSigningKeyCode: $(microBuildSigningKeyCode.attestations)
         SignType: real

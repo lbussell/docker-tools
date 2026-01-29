@@ -107,6 +107,6 @@ stages:
           tenantId: $(testTenant)
 
       Signing:
-        ImageSigningKeyCode: $(signing-test.imageKeyCode)
-        ReferrerSigningKeyCode: $(signing-test.referrerKeyCode)
+        ImageSigningKeyCode: $(microBuildSigningKeyCode.testing)
+        ReferrerSigningKeyCode: $(microBuildSigningKeyCode.testing)
         SignType: test

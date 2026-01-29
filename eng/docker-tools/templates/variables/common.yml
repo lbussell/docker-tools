@@ -79,3 +79,10 @@ variables:
   value: 00000000-0000-0000-0000-000000000000
 - name: acr-staging.subscription
   value: 00000000-0000-0000-0000-000000000000
+
+- name: microBuildSigningKeyCode.containers
+  value: 4512
+- name: microBuildSigningKeyCode.attestations
+  value: 4571
+- name: microBuildSigningKeyCode.testing
+  value: 2151
