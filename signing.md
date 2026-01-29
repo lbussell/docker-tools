@@ -261,13 +261,13 @@ public sealed record BuildConfiguration
 - [x] Add `BuildConfiguration` record with `ArtifactStagingDirectory`
 - [x] Add `BuildConfiguration` to DI via Options pattern
 
-### Phase 2: ORAS Abstraction
-- [ ] Add `OrasProject.Oras` NuGet package (version 0.4.0)
-- [ ] Define new interfaces (`IOrasDescriptorService`, `IOrasSignatureService`) - separate from existing `IOrasClient`
-- [ ] Create `OrasCredentialProviderAdapter` implementing `ICredentialProvider` (wraps `IRegistryCredentialsProvider`)
-- [ ] Implement `OrasDotNetDescriptorService` using `Repository.ResolveAsync()`
-- [ ] Implement `OrasDotNetSignatureService` using `Repository.Manifests.PushAsync()`
-- [ ] Register new implementations in DI (existing `IOrasClient` unchanged)
+### Phase 2: ORAS Abstraction ✅
+- [x] Add `OrasProject.Oras` NuGet package (version 0.4.0)
+- [x] Define new interfaces (`IOrasDescriptorService`, `IOrasSignatureService`) - separate from existing `IOrasClient`
+- [x] Create `OrasCredentialProviderAdapter` implementing `ICredentialProvider` (wraps `IRegistryCredentialsProvider`)
+- [x] Implement `OrasDotNetDescriptorService` using `Repository.ResolveAsync()`
+- [x] Implement `OrasDotNetSignatureService` using `Packer.PackManifestAsync()`
+- [x] Register new implementations in DI (existing `IOrasClient` unchanged)
 
 ### Phase 3: Signing Services
 - [ ] Implement `IEsrpSigningService` (calls ESRP to sign directory)
