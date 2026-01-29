@@ -198,7 +198,8 @@ public sealed record SigningConfiguration
 public sealed record BuildConfiguration
 {
     public static string ConfigurationKey => nameof(BuildConfiguration);
-    public DirectoryInfo? ArtifactStagingDirectory { get; set; }
+    // Path to root directory for build artifacts (string for config binding)
+    public string? ArtifactStagingDirectory { get; set; }
 }
 ```
 
