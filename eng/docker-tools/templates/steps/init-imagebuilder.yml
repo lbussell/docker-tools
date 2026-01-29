@@ -2,7 +2,12 @@
 # - Custom init steps (when provided by caller)
 # - Default pull-based setup (Linux containerized, Windows native executable)
 # - appsettings.json generation for publish configuration
-# - MicroBuild signing plugin installation (when signing is enabled)
+# - MicroBuild signing plugin installation (when enableSigning variable is true)
+#
+# To enable signing, set these variables in your pipeline YAML:
+#   variables:
+#     enableSigning: true
+#     signType: real  # or 'test' for non-production
 parameters:
 - name: dockerClientOS
   type: string
@@ -21,18 +26,6 @@ parameters:
 - name: customInitSteps
   type: stepList
   default: []
-
-# Signing configuration - set to enable container image signing
-- name: enableSigning
-  type: boolean
-  default: false
-
-- name: signType
-  type: string
-  default: test
-  values:
-  - test
-  - real
 
 steps:
 # Custom ImageBuilder setup (e.g., bootstrap from source)
@@ -69,12 +62,12 @@ steps:
       condition: and(always(), ${{ parameters.condition }})
       continueOnError: true
 
-# Install MicroBuild signing plugin (when signing is enabled)
-- ${{ if eq(parameters.enableSigning, true) }}:
+# Install MicroBuild signing plugin (when enableSigning variable is true)
+- ${{ if eq(variables.enableSigning, 'true') }}:
   - template: /eng/docker-tools/templates/steps/install-microbuild.yml@self
     parameters:
       dockerClientOS: ${{ parameters.dockerClientOS }}
-      signType: ${{ parameters.signType }}
+      signType: ${{ variables.signType }}
       condition: ${{ parameters.condition }}
 
 # Generate appsettings.json with publish configuration for ImageBuilder to read
@@ -129,7 +122,7 @@ steps:
 
         # Add MicroBuild signing mount and env var when signing is enabled
         $signingArgs = @()
-        if ("${{ parameters.enableSigning }}" -eq "true" -and $env:MBSIGN_APPFOLDER) {
+        if ("$(enableSigning)" -eq "true" -and $env:MBSIGN_APPFOLDER) {
           $signingArgs = @(
             "-v"
             "$env:MBSIGN_APPFOLDER`:/microbuild"
@@ -137,7 +130,7 @@ steps:
             "MBSIGN_APPFOLDER=/microbuild"
           )
           Write-Host "MicroBuild signing enabled, mounting $env:MBSIGN_APPFOLDER to /microbuild"
-        } elseif ("${{ parameters.enableSigning }}" -eq "true") {
+        } elseif ("$(enableSigning)" -eq "true") {
           Write-Warning "MBSIGN_APPFOLDER not set - signing will not work"
         }
 

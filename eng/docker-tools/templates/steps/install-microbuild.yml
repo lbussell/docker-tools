@@ -23,6 +23,7 @@ steps:
   displayName: Install MicroBuild Signing Plugin
   condition: and(succeeded(), ${{ parameters.condition }})
   inputs:
+    version: 1.1.1233-g8d354617b3
     ${{ if eq(parameters.signType, 'test') }}:
       signType: test
     ${{ else }}:

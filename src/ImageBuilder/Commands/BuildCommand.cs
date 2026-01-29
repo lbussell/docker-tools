@@ -170,9 +170,9 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
             }
 
             var signingConfig = _publishConfiguration.Signing;
-            if (signingConfig is null)
+            if (signingConfig is null || !signingConfig.Enabled)
             {
-                _loggerService.WriteMessage("Signing configuration not provided. Skipping image signing.");
+                _loggerService.WriteMessage("Signing is not enabled. Skipping image signing.");
                 return;
             }
 

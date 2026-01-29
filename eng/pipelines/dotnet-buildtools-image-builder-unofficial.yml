@@ -43,6 +43,10 @@ variables:
 - name: "System.Debug"
   value: true
   readonly: true
+# Enable container image signing
+- name: "enableSigning"
+  value: true
+  readonly: true
 
 resources:
   repositories:

@@ -107,6 +107,7 @@ stages:
           tenantId: $(publish.serviceConnection.tenantId)
 
       Signing:
+        Enabled: ${{ variables.enableSigning }}
         ImageSigningKeyCode: $(microBuildSigningKeyCode.containers)
         ReferrerSigningKeyCode: $(microBuildSigningKeyCode.attestations)
         SignType: real
