@@ -1,0 +1,59 @@
+# Attach a referrer manifest to an existing manifest
+
+```cs
+using OrasProject.Oras.Registry.Remote;
+using OrasProject.Oras.Registry;
+using OrasProject.Oras.Registry.Remote.Auth;
+using Microsoft.Extensions.Caching.Memory;
+
+namespace OrasProject.Oras.Tests.Examples;
+
+public static class AttachReferrer
+{
+    // This example demonstrates how to attach a referrer artifact to an existing manifest in a remote registry.
+    // For production use: Implement proper exception handling, cancellation, and dependency injection.
+    public static async Task AttachReferrerAsync()
+    {
+        const string registry = "localhost:5000"; // change to your target registry
+        const string repository = "myrepo/test"; // change to your target repository
+
+        // Create a HttpClient instance for making HTTP requests.
+        var httpClient = new HttpClient();
+
+        // Create a simple credential provider with static credentials.
+        var credentialProvider = new SingleRegistryCredentialProvider(registry, new Credential
+        {
+            RefreshToken = "refresh_token" // change to your actual refresh token
+        });
+
+        // Create a memory cache for caching access tokens to improve auth performance.
+        var memoryCache = new MemoryCache(new MemoryCacheOptions());
+
+        // Create a repository instance to interact with the target repository.
+        var repo = new Repository(new RepositoryOptions
+        {
+            Reference = Reference.Parse($"{registry}/{repository}"),
+            Client = new Client(httpClient, credentialProvider, new Cache(memoryCache)),
+        });
+
+        // Resolve the target reference (tag or digest) to get its descriptor.
+        const string subjectReference = "target"; // could also be a digest like "sha256:..."
+        var subjectDescriptor = await repo.ResolveAsync(subjectReference);
+
+        // Pack the manifest with the specified artifact type and annotations and push it to the repository.
+        var annotations = new Dictionary<string, string>
+        {
+            ["org.opencontainers.image.created"] = "2000-01-01T00:00:00Z",
+            ["eol"] = "2025-07-01"
+        };
+        var options = new PackManifestOptions
+        {
+            ManifestAnnotations = annotations,
+            Subject = subjectDescriptor, // set subject to make this manifest a referrer
+        };
+        const string artifactType = "doc/example";
+        var referrerManifestDescriptor = await Packer.PackManifestAsync(repo, Packer.ManifestVersion.Version1_1, artifactType, options);
+    }
+}
+
+```

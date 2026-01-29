@@ -54,7 +54,7 @@ interface IOrasDescriptorService
 
 interface IOrasSignatureService
 {
-    Task PushSignatureAsync(string imageReference, PayloadSigningResult result, CancellationToken ct);
+    Task<string> PushSignatureAsync(string imageReference, PayloadSigningResult result, CancellationToken ct);
 }
 
 interface IOrasDiscoveryService  // existing functionality
@@ -68,11 +68,60 @@ interface IOrasAttachService  // existing functionality
 }
 ```
 
-**Implementations:**
-- `OrasCliService` - Uses ORAS CLI (fallback, Linux only)
-- `OrasDotNetService` - Uses ORAS .NET library (primary, cross-platform)
+### ORAS .NET Library API (OrasProject.Oras 0.4.0)
 
-The ORAS .NET library is unproven, so maintaining a CLI fallback provides a safety net. The existing `IOrasClient` will be refactored to implement the segregated interfaces.
+Key types for our implementation:
+
+**Repository** - Main entry point for registry operations:
+```cs
+var repo = new Repository(new RepositoryOptions
+{
+    Reference = Reference.Parse($"{registry}/{repository}"),
+    Client = new Client(httpClient, credentialProvider, new Cache(memoryCache)),
+});
+Descriptor desc = await repo.ResolveAsync(reference, ct);  // Get descriptor
+```
+
+**Packer.PackManifestAsync** - Attach referrer artifacts (signatures):
+```cs
+var options = new PackManifestOptions
+{
+    ManifestAnnotations = annotations,  // e.g., io.cncf.notary.x509chain.thumbprint#S256
+    Subject = subjectDescriptor,        // The image being signed - makes this a referrer
+};
+var signatureDescriptor = await Packer.PackManifestAsync(
+    repo, 
+    Packer.ManifestVersion.Version1_1, 
+    "application/vnd.cncf.notary.signature",  // artifactType
+    options);
+```
+
+**Auth.Client** - Authenticated HTTP client:
+```cs
+var credentialProvider = new SingleRegistryCredentialProvider(registry, credential);
+var memoryCache = new MemoryCache(new MemoryCacheOptions());
+var authClient = new Client(httpClient, credentialProvider, new Cache(memoryCache));
+```
+
+**ICredentialProvider** - Interface for providing credentials:
+```cs
+interface ICredentialProvider
+{
+    Task<Credential> ResolveCredentialAsync(string hostname, CancellationToken ct);
+}
+```
+
+**Implementation approach:**
+1. Create `OrasCredentialProviderAdapter` that wraps our existing `IRegistryCredentialsProvider`
+2. Use `repo.ResolveAsync()` to get the subject descriptor (image being signed)
+3. Use `Packer.PackManifestAsync()` with `Subject` set to attach signature as referrer
+4. Annotations include `io.cncf.notary.x509chain.thumbprint#S256` with certificate chain
+
+**Implementations:**
+- `OrasDotNetDescriptorService` - Uses ORAS .NET library for descriptor resolution
+- `OrasDotNetSignatureService` - Uses ORAS .NET library for pushing signatures
+
+Existing `IOrasClient`/`OrasClient` remain unchanged - they continue to serve other parts of the codebase. The new interfaces are independent and used only by the signing services.
 
 ### Design Decisions
 
@@ -86,7 +135,7 @@ The ORAS .NET library is unproven, so maintaining a CLI fallback provides a safe
 | **Certificate chain calculated internally** | The chain (in `io.cncf.notary.x509chain.thumbprint#S256` format per Notary v2 spec) is computed by `IPayloadSigningService`, not returned by ESRP. |
 | **`IPayloadSigningService` as abstraction point** | If we need to support different signing backends in the future, this is the interface to swap implementations. `IEsrpSigningService` is specific to our current infrastructure. |
 | **Interface segregation for ORAS** | Different operations have different consumers; easier to mock/test |
-| **Two ORAS backends (CLI + .NET library)** | .NET library is unproven; CLI fallback provides safety net |
+| **Two ORAS backends (CLI + .NET library)** | Existing CLI-based `IOrasClient` unchanged; new .NET library services for signing only |
 | **Configuration-driven key codes** | prod vs nonprod determined by pipeline config, no runtime logic |
 | **`ImageArtifactDetails` as signing input** | Already contains all digests; no additional registry queries for digest list |
 | **Dry-run handled at command level** | Signing services don't need dry-run logic; commands will conditionally invoke signing. |
@@ -213,10 +262,12 @@ public sealed record BuildConfiguration
 - [x] Add `BuildConfiguration` to DI via Options pattern
 
 ### Phase 2: ORAS Abstraction
-- [ ] Define segregated ORAS interfaces (`IOrasDescriptorService`, `IOrasSignatureService`)
-- [ ] Refactor existing `OrasClient` to implement the interfaces
-- [ ] Add `OrasDotNetService` implementation using ORAS .NET library
-- [ ] Register implementations in DI (configurable backend selection)
+- [ ] Add `OrasProject.Oras` NuGet package (version 0.4.0)
+- [ ] Define new interfaces (`IOrasDescriptorService`, `IOrasSignatureService`) - separate from existing `IOrasClient`
+- [ ] Create `OrasCredentialProviderAdapter` implementing `ICredentialProvider` (wraps `IRegistryCredentialsProvider`)
+- [ ] Implement `OrasDotNetDescriptorService` using `Repository.ResolveAsync()`
+- [ ] Implement `OrasDotNetSignatureService` using `Repository.Manifests.PushAsync()`
+- [ ] Register new implementations in DI (existing `IOrasClient` unchanged)
 
 ### Phase 3: Signing Services
 - [ ] Implement `IEsrpSigningService` (calls ESRP to sign directory)
@@ -244,9 +295,9 @@ public sealed record BuildConfiguration
 ## Files to Create/Modify
 
 ### New Files
-- `src/ImageBuilder/Signing/ImageSigningRequest.cs`
-- `src/ImageBuilder/Signing/PayloadSigningResult.cs`
-- `src/ImageBuilder/Signing/ImageSigningResult.cs`
+- `src/ImageBuilder/Signing/ImageSigningRequest.cs` ✅
+- `src/ImageBuilder/Signing/PayloadSigningResult.cs` ✅
+- `src/ImageBuilder/Signing/ImageSigningResult.cs` ✅
 - `src/ImageBuilder/Signing/IBulkImageSigningService.cs`
 - `src/ImageBuilder/Signing/IPayloadSigningService.cs`
 - `src/ImageBuilder/Signing/IEsrpSigningService.cs`
@@ -254,25 +305,29 @@ public sealed record BuildConfiguration
 - `src/ImageBuilder/Signing/PayloadSigningService.cs`
 - `src/ImageBuilder/Signing/EsrpSigningService.cs`
 - `src/ImageBuilder/Signing/CertificateChainCalculator.cs`
-- `src/ImageBuilder/Configuration/SigningConfiguration.cs`
-- `src/ImageBuilder/Configuration/BuildConfiguration.cs`
+- `src/ImageBuilder/Configuration/SigningConfiguration.cs` ✅
+- `src/ImageBuilder/Configuration/BuildConfiguration.cs` ✅
 - `src/ImageBuilder/Oras/IOrasDescriptorService.cs`
 - `src/ImageBuilder/Oras/IOrasSignatureService.cs`
-- `src/ImageBuilder/Oras/OrasDotNetService.cs`
+- `src/ImageBuilder/Oras/OrasCredentialProviderAdapter.cs`
+- `src/ImageBuilder/Oras/OrasDotNetDescriptorService.cs`
+- `src/ImageBuilder/Oras/OrasDotNetSignatureService.cs`
 - `src/ImageBuilder.Tests/Signing/*.cs`
 
 ### Modified Files
-- `src/ImageBuilder/Configuration/PublishConfiguration.cs` - Add `Signing` property
-- `src/ImageBuilder/Configuration/ConfigurationExtensions.cs` - Register `BuildConfiguration`
+- `src/ImageBuilder/Configuration/PublishConfiguration.cs` - Add `Signing` property ✅
+- `src/ImageBuilder/Configuration/ConfigurationExtensions.cs` - Register `BuildConfiguration` ✅
 - `src/ImageBuilder/Commands/BuildCommand.cs` - Inject and call signing service
-- `src/ImageBuilder/ImageBuilder.cs` - Register signing services in DI
-- `src/ImageBuilder/OrasClient.cs` - Refactor to implement segregated interfaces
+- `src/ImageBuilder/ImageBuilder.cs` - Register signing services in DI (partially done ✅)
+- `src/ImageBuilder/Microsoft.DotNet.ImageBuilder.csproj` - Add OrasProject.Oras package reference
 - `eng/docker-tools/templates/variables/publish-config-prod.yml`
 - `eng/docker-tools/templates/variables/publish-config-nonprod.yml`
 
+**Note:** Existing `IOrasClient` and `OrasClient` are NOT modified. New ORAS interfaces are independent and used only by the signing services.
+
 ## Open Questions
 
-1. **ORAS .NET library maturity** - Need to evaluate if it supports all required operations (manifest fetch, signature push)
+1. ~~**ORAS .NET library maturity**~~ - Inspected API; `Repository.ResolveAsync()` and `Manifests.PushAsync()` provide what we need
 
 ## ESRP Integration (DDSignFiles.dll)
 
