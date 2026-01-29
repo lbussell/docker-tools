@@ -14,6 +14,7 @@ using Microsoft.DotNet.ImageBuilder.Commands;
 using Microsoft.DotNet.ImageBuilder.Configuration;
 using Microsoft.DotNet.ImageBuilder.Models.Image;
 using Microsoft.DotNet.ImageBuilder.Models.Manifest;
+using Microsoft.DotNet.ImageBuilder.Signing;
 using Microsoft.DotNet.ImageBuilder.Tests.Helpers;
 using Microsoft.DotNet.ImageBuilder.ViewModel;
 using Microsoft.Extensions.Options;
@@ -3547,6 +3548,8 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
             IRegistryCredentialsProvider? registryCredentialsProvider = null,
             IAzureTokenCredentialProvider? azureTokenCredentialProvider = null,
             IImageCacheService? imageCacheService = null,
+            IBulkImageSigningService? signingService = null,
+            ISigningRequestGenerator? signingRequestGenerator = null,
             IOptions<PublishConfiguration>? publishOptions = null)
         {
             BuildCommand command = new(
@@ -3559,6 +3562,8 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
                 registryCredentialsProvider ?? Mock.Of<IRegistryCredentialsProvider>(),
                 azureTokenCredentialProvider ?? Mock.Of<IAzureTokenCredentialProvider>(),
                 imageCacheService ?? Mock.Of<IImageCacheService>(),
+                signingService ?? Mock.Of<IBulkImageSigningService>(),
+                signingRequestGenerator ?? Mock.Of<ISigningRequestGenerator>(),
                 publishOptions ?? CreateOptionsMock<PublishConfiguration>());
 
             return command;

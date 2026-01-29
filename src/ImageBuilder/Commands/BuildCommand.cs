@@ -30,6 +30,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
         private readonly IAzureTokenCredentialProvider _tokenCredentialProvider;
         private readonly IImageCacheService _imageCacheService;
         private readonly IBulkImageSigningService _signingService;
+        private readonly ISigningRequestGenerator _signingRequestGenerator;
         private readonly PublishConfiguration _publishConfiguration;
         private readonly ImageDigestCache _imageDigestCache;
         private readonly List<TagInfo> _processedTags = new List<TagInfo>();
@@ -56,6 +57,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
             IAzureTokenCredentialProvider tokenCredentialProvider,
             IImageCacheService imageCacheService,
             IBulkImageSigningService signingService,
+            ISigningRequestGenerator signingRequestGenerator,
             IOptions<PublishConfiguration> publishConfigOptions)
         {
             _dockerService = new DockerServiceCache(dockerService ?? throw new ArgumentNullException(nameof(dockerService)));
@@ -67,6 +69,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
             _tokenCredentialProvider = tokenCredentialProvider ?? throw new ArgumentNullException(nameof(tokenCredentialProvider));
             _imageCacheService = imageCacheService ?? throw new ArgumentNullException(nameof(imageCacheService));
             _signingService = signingService ?? throw new ArgumentNullException(nameof(signingService));
+            _signingRequestGenerator = signingRequestGenerator ?? throw new ArgumentNullException(nameof(signingRequestGenerator));
             _publishConfiguration = publishConfigOptions?.Value ?? throw new ArgumentNullException(nameof(publishConfigOptions));
 
             // Lazily create services which need access to options
@@ -173,9 +176,21 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
                 return;
             }
 
-            // TODO: Generate signing requests from built platforms
-            // For now, this is a placeholder for the signing integration
-            _loggerService.WriteMessage("Image signing is configured but not yet fully implemented.");
+            if (_imageArtifactDetails is null)
+            {
+                _loggerService.WriteMessage("No image artifact details available. Skipping image signing.");
+                return;
+            }
+
+            var requests = await _signingRequestGenerator.GeneratePlatformSigningRequestsAsync(_imageArtifactDetails);
+
+            if (requests.Count == 0)
+            {
+                _loggerService.WriteMessage("No images to sign.");
+                return;
+            }
+
+            await _signingService.SignImagesAsync(requests, signingConfig.ImageSigningKeyCode);
         }
 
         private async Task PublishImageInfoAsync()
