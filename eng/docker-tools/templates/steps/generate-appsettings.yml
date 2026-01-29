@@ -3,6 +3,9 @@
 parameters:
 - name: publishConfig
   type: object
+- name: artifactsPath
+  type: string
+  default: ""
 - name: condition
   type: string
   default: "true"
@@ -11,7 +14,10 @@ steps:
 - powershell: |-
     $appsettingsJsonContent = @"
     {
-      "PublishConfiguration": ${{ convertToJson(parameters.publishConfig) }}
+      "PublishConfiguration": ${{ convertToJson(parameters.publishConfig) }},
+      "BuildConfiguration": {
+        "ArtifactStagingDirectory": "${{ parameters.artifactsPath }}"
+      }
     }
     "@
     Set-Content -Path "appsettings.json" -Value $appsettingsJsonContent

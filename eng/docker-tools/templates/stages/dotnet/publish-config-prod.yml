@@ -105,3 +105,7 @@ stages:
           id: $(publish.serviceConnection.id)
           clientId: $(publish.serviceConnection.clientId)
           tenantId: $(publish.serviceConnection.tenantId)
+
+      Signing:
+        ImageSigningKeyCode: $(signing.imageKeyCode)
+        ReferrerSigningKeyCode: $(signing.referrerKeyCode)

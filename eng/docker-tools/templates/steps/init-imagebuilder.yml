@@ -60,6 +60,7 @@ steps:
 - template: /eng/docker-tools/templates/steps/generate-appsettings.yml@self
   parameters:
     publishConfig: ${{ parameters.publishConfig }}
+    artifactsPath: $(artifactsPath)
     condition: ${{ parameters.condition }}
 
 # On Linux, build the "withrepo" image that includes the repo's source code.
