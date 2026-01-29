@@ -224,6 +224,7 @@ public sealed record BuildConfiguration
 
 ### Phase 3: Signing Services
 - [ ] Implement `IEsrpSigningService` (calls ESRP to sign directory)
+- [ ] Port certificate chain calculation from Python to .NET (CBOR parsing, SHA256 thumbprints)
 - [ ] Implement `IPayloadSigningService` (writes payloads, calls ESRP, calculates cert chain)
 - [ ] Implement `IBulkImageSigningService` (orchestrates payload signing + ORAS push)
 - [ ] Register services in DI
@@ -257,6 +258,7 @@ public sealed record BuildConfiguration
 - `src/ImageBuilder/Signing/BulkImageSigningService.cs`
 - `src/ImageBuilder/Signing/PayloadSigningService.cs`
 - `src/ImageBuilder/Signing/EsrpSigningService.cs`
+- `src/ImageBuilder/Signing/CertificateChainCalculator.cs`
 - `src/ImageBuilder/Configuration/SigningConfiguration.cs`
 - `src/ImageBuilder/Configuration/BuildConfiguration.cs`
 - `src/ImageBuilder/Oras/IOrasDescriptorService.cs`
@@ -277,4 +279,18 @@ public sealed record BuildConfiguration
 
 1. **ORAS .NET library maturity** - Need to evaluate if it supports all required operations (manifest fetch, signature push)
 2. **ESRP integration details** - Exact command/API for directory signing
-3. **Certificate chain calculation** - Reference implementation exists, needs to be integrated
+
+## Certificate Chain Calculation
+
+Reference implementation in `generate-cert-chain-thumbprint.py`. Needs to be ported to .NET.
+
+**Algorithm:**
+1. Read signed payload file as COSE_Sign1 envelope (CBOR tag 18)
+2. Extract x5chain (key 33) from unprotected header
+3. For each certificate in chain, compute SHA256 hash
+4. Return JSON array of hex-encoded thumbprints
+
+**Dependencies needed:**
+- CBOR parsing library (e.g., `System.Formats.Cbor` or `PeterO.Cbor`)
+
+**Output format:** `["thumbprint1", "thumbprint2", ...]` used in `io.cncf.notary.x509chain.thumbprint#S256` annotation.
