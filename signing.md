@@ -276,10 +276,10 @@ public sealed record BuildConfiguration
 - [ ] Implement `IBulkImageSigningService` (orchestrates payload signing + ORAS push)
 - [ ] Register services in DI
 
-### Phase 4: BuildCommand Integration
-- [ ] Inject `IBulkImageSigningService` into `BuildCommand`
-- [ ] Call signing service after successful push (respect dry-run)
-- [ ] Pass `ImageArtifactDetails` and key code from configuration
+### Phase 4: BuildCommand Integration ✅
+- [x] Inject `IBulkImageSigningService` into `BuildCommand`
+- [x] Call signing service after successful push (respect dry-run)
+- [ ] Generate `ImageSigningRequest` from built platforms (TODO: complete implementation)
 
 ### Phase 5: Pipeline Configuration
 - [ ] Add signing key codes to `publish-config-prod.yml`
