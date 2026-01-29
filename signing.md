@@ -272,14 +272,16 @@ public sealed record BuildConfiguration
 ### Phase 3: Signing Services
 - [ ] Implement `IEsrpSigningService` (calls ESRP to sign directory)
 - [ ] Port certificate chain calculation from Python to .NET (CBOR parsing, SHA256 thumbprints)
-- [ ] Implement `IPayloadSigningService` (writes payloads, calls ESRP, calculates cert chain)
-- [ ] Implement `IBulkImageSigningService` (orchestrates payload signing + ORAS push)
-- [ ] Register services in DI
+- [x] Implement `IPayloadSigningService` (writes payloads, calls ESRP, calculates cert chain)
+- [x] Implement `IBulkImageSigningService` (orchestrates payload signing + ORAS push)
+- [x] Register services in DI
 
 ### Phase 4: BuildCommand Integration ✅
 - [x] Inject `IBulkImageSigningService` into `BuildCommand`
 - [x] Call signing service after successful push (respect dry-run)
-- [ ] Generate `ImageSigningRequest` from built platforms (TODO: complete implementation)
+- [x] Implement `ISigningRequestGenerator` interface
+- [x] Implement `SigningRequestGenerator` (using LINQ)
+- [x] Add unit tests for SigningRequestGenerator
 
 ### Phase 5: Pipeline Configuration
 - [ ] Add signing key codes to `publish-config-prod.yml`
@@ -287,7 +289,7 @@ public sealed record BuildConfiguration
 - [ ] Add `ArtifactStagingDirectory` to build configuration
 
 ### Phase 6: Testing & Cleanup
-- [ ] Unit tests for signing services
+- [x] Unit tests for signing services (OrasCredentialProviderAdapter, SigningRequestGenerator)
 - [ ] Unit tests for ORAS .NET implementation
 - [ ] Integration test with mock ESRP
 - [ ] Delete unused `GenerateSigningPayloadsCommand`
