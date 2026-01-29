@@ -1,0 +1,40 @@
+# Installs the MicroBuild signing plugin for ESRP container image signing.
+# After installation, MBSIGN_APPFOLDER environment variable points to DDSignFiles.dll location.
+parameters:
+- name: dockerClientOS
+  type: string
+  values:
+  - linux
+  - windows
+
+- name: signType
+  type: string
+  default: test
+  values:
+  - test
+  - real
+
+- name: condition
+  type: string
+  default: "true"
+
+steps:
+- task: MicroBuildSigningPlugin@4
+  displayName: Install MicroBuild Signing Plugin
+  condition: and(succeeded(), ${{ parameters.condition }})
+  inputs:
+    ${{ if eq(parameters.signType, 'test') }}:
+      signType: test
+    ${{ else }}:
+      signType: real
+    zipSources: false
+    feedSource: https://dnceng.pkgs.visualstudio.com/_packaging/MicroBuildToolset/nuget/v3/index.json
+    ConnectedServiceName: 'MicroBuild Signing Task (DevDiv)'
+    ${{ if eq(parameters.dockerClientOS, 'linux') }}:
+      ConnectedPMEServiceName: c24de2a5-cc7a-493d-95e4-8e5ff5cad2bc
+    ${{ else }}:
+      ConnectedPMEServiceName: 248d384a-b39b-46e3-8ad5-c2c210d5e7ca
+  env:
+    TeamName: DotNetCore
+    MicroBuildOutputFolderOverride: $(Agent.TempDirectory)
+    SYSTEM_ACCESSTOKEN: $(System.AccessToken)
