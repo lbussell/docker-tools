@@ -109,3 +109,4 @@ stages:
       Signing:
         ImageSigningKeyCode: $(signing.imageKeyCode)
         ReferrerSigningKeyCode: $(signing.referrerKeyCode)
+        SignType: real

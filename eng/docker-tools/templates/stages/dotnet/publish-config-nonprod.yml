@@ -109,3 +109,4 @@ stages:
       Signing:
         ImageSigningKeyCode: $(signing-test.imageKeyCode)
         ReferrerSigningKeyCode: $(signing-test.referrerKeyCode)
+        SignType: test
