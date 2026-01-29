@@ -205,12 +205,12 @@ public sealed record BuildConfiguration
 
 ## Implementation Plan
 
-### Phase 1: Configuration & Models
-- [ ] Add signing request/result records to Models project
-- [ ] Add `SigningConfiguration` record with `ImageSigningKeyCode` (int), `ReferrerSigningKeyCode` (int)
-- [ ] Add `Signing` property to `PublishConfiguration`
-- [ ] Add `BuildConfiguration` record with `ArtifactStagingDirectory`
-- [ ] Add `BuildConfiguration` to DI via Options pattern
+### Phase 1: Configuration & Models ✅
+- [x] Add signing request/result records to Signing folder
+- [x] Add `SigningConfiguration` record with `ImageSigningKeyCode` (int), `ReferrerSigningKeyCode` (int)
+- [x] Add `Signing` property to `PublishConfiguration`
+- [x] Add `BuildConfiguration` record with `ArtifactStagingDirectory`
+- [x] Add `BuildConfiguration` to DI via Options pattern
 
 ### Phase 2: ORAS Abstraction
 - [ ] Define segregated ORAS interfaces (`IOrasDescriptorService`, `IOrasSignatureService`)
