@@ -13,11 +13,13 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
     public class PullImagesCommand : ManifestCommand<PullImagesOptions, PullImagesOptionsBuilder>
     {
         private readonly IDockerService _dockerService;
+        private readonly IImageInfoService _imageInfoService;
         private readonly ILogger<PullImagesCommand> _logger;
 
-        public PullImagesCommand(IDockerService dockerService, ILogger<PullImagesCommand> logger)
+        public PullImagesCommand(IDockerService dockerService, ILogger<PullImagesCommand> logger, IImageInfoService imageInfoService)
         {
             _dockerService = dockerService ?? throw new ArgumentNullException(nameof(dockerService));
+            _imageInfoService = imageInfoService ?? throw new ArgumentNullException(nameof(imageInfoService));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
@@ -36,7 +38,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
             {
                 // We want to apply manifest filtering to the loading of the image info file. This allows, for example,
                 // only images of a specific architecture to be pulled.
-                ImageArtifactDetails imageArtifactDetails = ImageInfoHelper.LoadFromFile(
+                ImageArtifactDetails imageArtifactDetails = _imageInfoService.LoadFromFile(
                     Options.ImageInfoPath, Manifest, skipManifestValidation: true, useFilteredManifest: true);
                 platformTags = imageArtifactDetails.Repos
                     .SelectMany(repo => repo.Images)

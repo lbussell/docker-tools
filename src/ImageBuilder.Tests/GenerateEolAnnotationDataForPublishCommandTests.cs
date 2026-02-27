@@ -1047,7 +1047,8 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
                 acrClientFactory: registryClientFactory,
                 acrContentClientFactory: registryContentClientFactory,
                 lifecycleMetadataService: lifecycleMetadataService,
-                registryCredentialsProvider: Mock.Of<IRegistryCredentialsProvider>());
+                registryCredentialsProvider: Mock.Of<IRegistryCredentialsProvider>(),
+                imageInfoService: TestHelper.CreateRealImageInfoService());
             command.Options.OldImageInfoPath = oldImageInfoPath;
             command.Options.NewImageInfoPath = newImageInfoPath;
             command.Options.EolDigestsListPath = newEolDigestsListPath;

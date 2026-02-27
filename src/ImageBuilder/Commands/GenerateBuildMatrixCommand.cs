@@ -22,19 +22,21 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
         private static readonly char[] s_pathSeparators = { '/', '\\' };
         private static readonly Regex s_versionRegex = new(@$"^(?<{VersionRegGroupName}>(\d|\.)+).*$");
         private readonly IImageCacheService _imageCacheService;
+        private readonly IImageInfoService _imageInfoService;
         private readonly ILogger<GenerateBuildMatrixCommand> _logger;
         private readonly ImageDigestCache _imageDigestCache;
         private readonly Lazy<ImageNameResolverForMatrix> _imageNameResolver;
 
-        public GenerateBuildMatrixCommand(IImageCacheService imageCacheService, IManifestServiceFactory manifestServiceFactory, ILogger<GenerateBuildMatrixCommand> logger) : base()
+        public GenerateBuildMatrixCommand(IImageCacheService imageCacheService, IManifestServiceFactory manifestServiceFactory, ILogger<GenerateBuildMatrixCommand> logger, IImageInfoService imageInfoService) : base()
         {
             _imageCacheService = imageCacheService ?? throw new ArgumentNullException(nameof(imageCacheService));
+            _imageInfoService = imageInfoService ?? throw new ArgumentNullException(nameof(imageInfoService));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _imageArtifactDetails = new Lazy<ImageArtifactDetails?>(() =>
             {
                 if (Options.ImageInfoPath != null)
                 {
-                    return ImageInfoHelper.LoadFromFile(Options.ImageInfoPath, Manifest, skipManifestValidation: true);
+                    return _imageInfoService.LoadFromFile(Options.ImageInfoPath, Manifest, skipManifestValidation: true);
                 }
 
                 return null;

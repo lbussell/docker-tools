@@ -16,11 +16,13 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
 {
     public class IngestKustoImageInfoCommand : ManifestCommand<IngestKustoImageInfoOptions, IngestKustoImageInfoOptionsBuilder>
     {
+        private readonly IImageInfoService _imageInfoService;
         private readonly IKustoClient _kustoClient;
         private readonly ILogger<IngestKustoImageInfoCommand> _logger;
 
-        public IngestKustoImageInfoCommand(ILogger<IngestKustoImageInfoCommand> logger, IKustoClient kustoClient)
+        public IngestKustoImageInfoCommand(ILogger<IngestKustoImageInfoCommand> logger, IKustoClient kustoClient, IImageInfoService imageInfoService)
         {
+            _imageInfoService = imageInfoService ?? throw new ArgumentNullException(nameof(imageInfoService));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kustoClient = kustoClient ?? throw new ArgumentNullException(nameof(kustoClient));
         }
@@ -55,7 +57,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
             StringBuilder imageInfo = new();
             StringBuilder layerInfo = new();
 
-            foreach (RepoData repo in ImageInfoHelper.LoadFromFile(Options.ImageInfoPath, Manifest).Repos)
+            foreach (RepoData repo in _imageInfoService.LoadFromFile(Options.ImageInfoPath, Manifest).Repos)
             {
                 foreach (ImageData image in repo.Images)
                 {

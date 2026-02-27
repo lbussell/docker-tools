@@ -11,6 +11,13 @@ namespace Microsoft.DotNet.ImageBuilder.Tests.Helpers
 {
     public static class TestHelper
     {
+        /// <summary>
+        /// Creates a real <see cref="ImageInfoService"/> for use in tests that
+        /// load real image info JSON files from the filesystem.
+        /// </summary>
+        public static IImageInfoService CreateRealImageInfoService() =>
+            new ImageInfoService(new FileSystem());
+
         public static TempFolderContext UseTempFolder()
         {
             return new TempFolderContext();
