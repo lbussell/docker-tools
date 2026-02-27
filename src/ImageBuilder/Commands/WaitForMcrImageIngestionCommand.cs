@@ -14,13 +14,15 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
 {
     public class WaitForMcrImageIngestionCommand : ManifestCommand<WaitForMcrImageIngestionOptions, WaitForMcrImageIngestionOptionsBuilder>
     {
+        private readonly IImageInfoService _imageInfoService;
         private readonly ILogger<WaitForMcrImageIngestionCommand> _logger;
         private readonly IMarImageIngestionReporter _imageIngestionReporter;
 
         public WaitForMcrImageIngestionCommand(
             IManifestJsonService manifestJsonService,
-            ILogger<WaitForMcrImageIngestionCommand> logger, IMarImageIngestionReporter imageIngestionReporter) : base(manifestJsonService)
+            ILogger<WaitForMcrImageIngestionCommand> logger, IMarImageIngestionReporter imageIngestionReporter, IImageInfoService imageInfoService) : base(manifestJsonService)
         {
+            _imageInfoService = imageInfoService ?? throw new ArgumentNullException(nameof(imageInfoService));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _imageIngestionReporter = imageIngestionReporter ?? throw new ArgumentNullException(nameof(imageIngestionReporter));
         }
@@ -40,7 +42,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
 
             if (!Options.IsDryRun)
             {
-                ImageArtifactDetails imageArtifactDetails = ImageInfoHelper.LoadFromFile(Options.ImageInfoPath, Manifest);
+                ImageArtifactDetails imageArtifactDetails = _imageInfoService.LoadFromFile(Options.ImageInfoPath, Manifest);
                 IEnumerable<DigestInfo> imageInfos = GetImageDigestInfos(imageArtifactDetails);
                 await _imageIngestionReporter.ReportImageStatusesAsync(
                     Options.MarServiceConnection,

@@ -6,7 +6,6 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Reflection;
 using Microsoft.DotNet.ImageBuilder.Commands;
@@ -113,18 +112,6 @@ namespace Microsoft.DotNet.ImageBuilder
         }
 
         /// <summary>
-        /// Loads an image info file as a parsed model directly with no validation or filtering.
-        /// </summary>
-        /// <param name="path">Path to the image info file.</param>
-        /// <exception cref="InvalidDataException"/>
-        public static ImageArtifactDetails DeserializeImageArtifactDetails(string path)
-        {
-            string imageInfoText = File.ReadAllText(path);
-            return ImageArtifactDetails.FromJson(imageInfoText) ??
-                throw new InvalidDataException($"Unable to deserialize image info file {path}");
-        }
-
-        /// <summary>
         /// Loads image info string content as a parsed model.
         /// </summary>
         /// <param name="imageInfoContent">The image info content to load.</param>
@@ -182,20 +169,6 @@ namespace Microsoft.DotNet.ImageBuilder
             }
 
             return imageArtifactDetails;
-        }
-
-        /// <summary>
-        /// Loads an image info file as a parsed model.
-        /// </summary>
-        /// <param name="path">Path to the image info file.</param>
-        /// <param name="manifest">Representation of the manifest model.</param>
-        /// <param name="skipManifestValidation">
-        /// Whether to skip validation if no associated manifest model item was found for a given image info model item.
-        /// </param>
-        /// <param name="useFilteredManifest">Whether to use the filtered content of the manifest for lookups.</param>
-        public static ImageArtifactDetails LoadFromFile(string path, ManifestInfo manifest, bool skipManifestValidation = false, bool useFilteredManifest = false)
-        {
-            return LoadFromContent(File.ReadAllText(path), manifest, skipManifestValidation, useFilteredManifest);
         }
 
         /// <summary>

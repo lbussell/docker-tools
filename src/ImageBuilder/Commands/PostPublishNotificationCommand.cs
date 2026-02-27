@@ -22,6 +22,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
     public class PostPublishNotificationCommand : ManifestCommand<PostPublishNotificationOptions, PostPublishNotificationOptionsBuilder>
     {
         private readonly IVssConnectionFactory _connectionFactory;
+        private readonly IImageInfoService _imageInfoService;
         private readonly INotificationService _notificationService;
         private readonly IOctokitClientFactory _octokitClientFactory;
 
@@ -29,9 +30,11 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
             IManifestJsonService manifestJsonService,
             IVssConnectionFactory connectionFactory,
             INotificationService notificationService,
-            IOctokitClientFactory octokitClientFactory) : base(manifestJsonService)
+            IOctokitClientFactory octokitClientFactory,
+            IImageInfoService imageInfoService) : base(manifestJsonService)
         {
             _connectionFactory = connectionFactory ?? throw new ArgumentNullException(nameof(connectionFactory));
+            _imageInfoService = imageInfoService ?? throw new ArgumentNullException(nameof(imageInfoService));
             _notificationService = notificationService ?? throw new ArgumentNullException(nameof(notificationService));
             _octokitClientFactory = octokitClientFactory ?? throw new ArgumentNullException(nameof(octokitClientFactory));
         }
@@ -234,7 +237,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
                 return Enumerable.Empty<string>();
             }
 
-            ImageArtifactDetails imageArtifactDetails = ImageInfoHelper.LoadFromFile(Options.ImageInfoPath, Manifest);
+            ImageArtifactDetails imageArtifactDetails = _imageInfoService.LoadFromFile(Options.ImageInfoPath, Manifest);
 
             List<(string digestSha, string repo, IEnumerable<string> tags)> imageInfos = new();
             foreach (RepoData repoData in imageArtifactDetails.Repos)

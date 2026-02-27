@@ -15,7 +15,12 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
 {
     public partial class MergeImageInfoCommand : ManifestCommand<MergeImageInfoOptions, MergeImageInfoOptionsBuilder>
     {
-        public MergeImageInfoCommand(IManifestJsonService manifestJsonService) : base(manifestJsonService) { }
+        private readonly IImageInfoService _imageInfoService;
+
+        public MergeImageInfoCommand(IManifestJsonService manifestJsonService, IImageInfoService imageInfoService) : base(manifestJsonService)
+        {
+            _imageInfoService = imageInfoService ?? throw new ArgumentNullException(nameof(imageInfoService));
+        }
 
         protected override string Description => "Merges the content of multiple image info files into one file";
 
@@ -29,7 +34,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
             List<(string Path, ImageArtifactDetails ImageArtifactDetails)> srcImageArtifactDetailsList = imageInfoFiles
                 .OrderBy(file => file) // Ensure the files are ordered for testing consistency between OS's.
                 .Select(imageDataPath =>
-                    (imageDataPath, ImageInfoHelper.LoadFromFile(
+                    (imageDataPath, _imageInfoService.LoadFromFile(
                                         imageDataPath,
                                         Manifest,
                                         skipManifestValidation: Options.IsPublishScenario)))

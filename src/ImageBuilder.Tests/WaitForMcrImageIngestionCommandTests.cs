@@ -47,7 +47,8 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
             WaitForMcrImageIngestionCommand command = new(
                 TestHelper.CreateManifestJsonService(),
                 Mock.Of<ILogger<WaitForMcrImageIngestionCommand>>(),
-                imageIngestionReporterMock.Object);
+                imageIngestionReporterMock.Object,
+                TestHelper.CreateRealImageInfoService());
 
             using TempFolderContext tempFolderContext = TestHelper.UseTempFolder();
 
@@ -181,7 +182,8 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
             WaitForMcrImageIngestionCommand command = new(
                 TestHelper.CreateManifestJsonService(),
                 Mock.Of<ILogger<WaitForMcrImageIngestionCommand>>(),
-                imageIngestionReporterMock.Object);
+                imageIngestionReporterMock.Object,
+                TestHelper.CreateRealImageInfoService());
 
             using TempFolderContext tempFolderContext = TestHelper.UseTempFolder();
 

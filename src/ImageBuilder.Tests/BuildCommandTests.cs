@@ -3588,7 +3588,8 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
             IManifestServiceFactory? manifestServiceFactory = null,
             IRegistryCredentialsProvider? registryCredentialsProvider = null,
             IAzureTokenCredentialProvider? azureTokenCredentialProvider = null,
-            IImageCacheService? imageCacheService = null)
+            IImageCacheService? imageCacheService = null,
+            IImageInfoService? imageInfoService = null)
         {
             BuildCommand command = new(
                 manifestJsonService ?? TestHelper.CreateManifestJsonService(),
@@ -3600,7 +3601,8 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
                 manifestServiceFactory ?? Mock.Of<IManifestServiceFactory>(),
                 registryCredentialsProvider ?? Mock.Of<IRegistryCredentialsProvider>(),
                 azureTokenCredentialProvider ?? Mock.Of<IAzureTokenCredentialProvider>(),
-                imageCacheService ?? Mock.Of<IImageCacheService>());
+                imageCacheService ?? Mock.Of<IImageCacheService>(),
+                imageInfoService ?? TestHelper.CreateRealImageInfoService());
 
             return command;
         }

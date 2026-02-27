@@ -15,6 +15,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands;
 public class GenerateEolAnnotationDataForPublishCommand :
     GenerateEolAnnotationDataCommandBase<GenerateEolAnnotationDataForPublishOptions, GenerateEolAnnotationDataOptionsForPublishBuilder>
 {
+    private readonly IImageInfoService _imageInfoService;
     private readonly ILogger _logger;
 
     public GenerateEolAnnotationDataForPublishCommand(
@@ -22,7 +23,8 @@ public class GenerateEolAnnotationDataForPublishCommand :
         IAcrClientFactory acrClientFactory,
         IAcrContentClientFactory acrContentClientFactory,
         ILifecycleMetadataService lifecycleMetadataService,
-        IRegistryCredentialsProvider registryCredentialsProvider)
+        IRegistryCredentialsProvider registryCredentialsProvider,
+        IImageInfoService imageInfoService)
         : base(
             logger,
             acrContentClientFactory,
@@ -30,6 +32,7 @@ public class GenerateEolAnnotationDataForPublishCommand :
             lifecycleMetadataService,
             registryCredentialsProvider)
     {
+        _imageInfoService = imageInfoService ?? throw new ArgumentNullException(nameof(imageInfoService));
         _logger = logger;
     }
 
@@ -43,8 +46,8 @@ public class GenerateEolAnnotationDataForPublishCommand :
             return [];
         }
 
-        ImageArtifactDetails oldImageArtifactDetails = ImageInfoHelper.DeserializeImageArtifactDetails(Options.OldImageInfoPath);
-        ImageArtifactDetails newImageArtifactDetails = ImageInfoHelper.DeserializeImageArtifactDetails(Options.NewImageInfoPath);
+        ImageArtifactDetails oldImageArtifactDetails = _imageInfoService.DeserializeImageArtifactDetails(Options.OldImageInfoPath);
+        ImageArtifactDetails newImageArtifactDetails = _imageInfoService.DeserializeImageArtifactDetails(Options.NewImageInfoPath);
 
         try
         {

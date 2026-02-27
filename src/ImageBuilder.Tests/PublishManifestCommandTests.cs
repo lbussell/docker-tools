@@ -56,7 +56,8 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
                 Mock.Of<ILogger<PublishManifestCommand>>(),
                 dateTimeService,
                 Mock.Of<IRegistryCredentialsProvider>(),
-                Mock.Of<IAzureTokenCredentialProvider>());
+                Mock.Of<IAzureTokenCredentialProvider>(),
+                TestHelper.CreateRealImageInfoService());
 
             using TempFolderContext tempFolderContext = new TempFolderContext();
 
@@ -316,7 +317,8 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
                 Mock.Of<ILogger<PublishManifestCommand>>(),
                 Mock.Of<IDateTimeService>(),
                 Mock.Of<IRegistryCredentialsProvider>(),
-                Mock.Of<IAzureTokenCredentialProvider>());
+                Mock.Of<IAzureTokenCredentialProvider>(),
+                TestHelper.CreateRealImageInfoService());
 
             using TempFolderContext tempFolderContext = new TempFolderContext();
 
@@ -446,7 +448,8 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
                 Mock.Of<ILogger<PublishManifestCommand>>(),
                 dateTimeService,
                 Mock.Of<IRegistryCredentialsProvider>(),
-                Mock.Of<IAzureTokenCredentialProvider>());
+                Mock.Of<IAzureTokenCredentialProvider>(),
+                TestHelper.CreateRealImageInfoService());
 
             using TempFolderContext tempFolderContext = new TempFolderContext();
 
@@ -638,7 +641,8 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
                 Mock.Of<ILogger<PublishManifestCommand>>(),
                 dateTimeService,
                 Mock.Of<IRegistryCredentialsProvider>(),
-                Mock.Of<IAzureTokenCredentialProvider>());
+                Mock.Of<IAzureTokenCredentialProvider>(),
+                TestHelper.CreateRealImageInfoService());
 
             using TempFolderContext tempFolderContext = new();
             command.Options.Manifest = Path.Combine(tempFolderContext.Path, "manifest.json");

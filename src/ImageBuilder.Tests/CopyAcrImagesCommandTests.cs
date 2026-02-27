@@ -37,7 +37,8 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
                 CopyAcrImagesCommand command = new(
                     TestHelper.CreateManifestJsonService(),
                     copyImageServiceMock.Object,
-                    Mock.Of<ILogger<CopyAcrImagesCommand>>());
+                    Mock.Of<ILogger<CopyAcrImagesCommand>>(),
+                    TestHelper.CreateRealImageInfoService());
                 command.Options.Manifest = Path.Combine(tempFolderContext.Path, "manifest.json");
                 command.Options.SourceRepoPrefix = command.Options.RepoPrefix = "test/";
                 command.Options.SourceRegistry = SourceRegistry;
@@ -126,7 +127,8 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
                 var command = new CopyAcrImagesCommand(
                     TestHelper.CreateManifestJsonService(),
                     copyImageServiceMock.Object,
-                    Mock.Of<ILogger<CopyAcrImagesCommand>>());
+                    Mock.Of<ILogger<CopyAcrImagesCommand>>(),
+                    TestHelper.CreateRealImageInfoService());
                 command.Options.Manifest = Path.Combine(tempFolderContext.Path, "manifest.json");
                 command.Options.SourceRepoPrefix = command.Options.RepoPrefix = "test/";
                 command.Options.SourceRegistry = SourceRegistry;
@@ -227,7 +229,8 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
             var command = new CopyAcrImagesCommand(
                 TestHelper.CreateManifestJsonService(),
                 copyImageServiceMock.Object,
-                Mock.Of<ILogger<CopyAcrImagesCommand>>());
+                Mock.Of<ILogger<CopyAcrImagesCommand>>(),
+                TestHelper.CreateRealImageInfoService());
             command.Options.Manifest = Path.Combine(tempFolderContext.Path, "manifest.json");
             command.Options.SourceRepoPrefix = command.Options.RepoPrefix = "test/";
             command.Options.SourceRegistry = SourceRegistry;
@@ -339,7 +342,8 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
             var command = new CopyAcrImagesCommand(
                 TestHelper.CreateManifestJsonService(),
                 copyImageServiceMock.Object,
-                Mock.Of<ILogger<CopyAcrImagesCommand>>());
+                Mock.Of<ILogger<CopyAcrImagesCommand>>(),
+                TestHelper.CreateRealImageInfoService());
             command.Options.Manifest = Path.Combine(tempFolderContext.Path, "manifest.json");
             command.Options.SourceRepoPrefix = command.Options.RepoPrefix = "test/";
             command.Options.SourceRegistry = SourceRegistry;

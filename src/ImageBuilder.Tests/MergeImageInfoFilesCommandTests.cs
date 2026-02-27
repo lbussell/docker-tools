@@ -181,7 +181,7 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
                     }
                 };
 
-                MergeImageInfoCommand command = new MergeImageInfoCommand(TestHelper.CreateManifestJsonService());
+                MergeImageInfoCommand command = new MergeImageInfoCommand(TestHelper.CreateManifestJsonService(), TestHelper.CreateRealImageInfoService());
                 command.Options.SourceImageInfoFolderPath = Path.Combine(context.Path, "image-infos");
                 command.Options.DestinationImageInfoPath = Path.Combine(context.Path, "output.json");
                 command.Options.Manifest = Path.Combine(context.Path, "manifest.json");
@@ -485,7 +485,7 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
                     }
                 };
 
-                MergeImageInfoCommand command = new MergeImageInfoCommand(TestHelper.CreateManifestJsonService());
+                MergeImageInfoCommand command = new MergeImageInfoCommand(TestHelper.CreateManifestJsonService(), TestHelper.CreateRealImageInfoService());
                 command.Options.SourceImageInfoFolderPath = Path.Combine(context.Path, "image-infos");
                 command.Options.DestinationImageInfoPath = Path.Combine(context.Path, "output.json");
                 command.Options.Manifest = Path.Combine(context.Path, "manifest.json");
@@ -620,7 +620,7 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
         [Fact]
         public async Task MergeImageInfoFilesCommand_SourceFolderPathNotFound()
         {
-            MergeImageInfoCommand command = new MergeImageInfoCommand(TestHelper.CreateManifestJsonService());
+            MergeImageInfoCommand command = new MergeImageInfoCommand(TestHelper.CreateManifestJsonService(), TestHelper.CreateRealImageInfoService());
             command.Options.SourceImageInfoFolderPath = "foo";
             command.Options.DestinationImageInfoPath = "output.json";
 
@@ -643,7 +643,7 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
                 // Store the content in a .txt file which the command should NOT be looking for.
                 File.WriteAllText("image-info.txt", JsonHelper.SerializeObject(imageArtifactDetails));
 
-                MergeImageInfoCommand command = new MergeImageInfoCommand(TestHelper.CreateManifestJsonService());
+                MergeImageInfoCommand command = new MergeImageInfoCommand(TestHelper.CreateManifestJsonService(), TestHelper.CreateRealImageInfoService());
                 command.Options.SourceImageInfoFolderPath = context.Path;
                 command.Options.DestinationImageInfoPath = "output.json";
 
@@ -772,7 +772,7 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
                 }
             };
 
-            MergeImageInfoCommand command = new(TestHelper.CreateManifestJsonService());
+            MergeImageInfoCommand command = new(TestHelper.CreateManifestJsonService(), TestHelper.CreateRealImageInfoService());
             command.Options.SourceImageInfoFolderPath = Path.Combine(tempFolderContext.Path, "image-infos");
             command.Options.DestinationImageInfoPath = Path.Combine(tempFolderContext.Path, "output.json");
             command.Options.Manifest = Path.Combine(tempFolderContext.Path, "manifest.json");
@@ -939,7 +939,7 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
                 }
             };
 
-            MergeImageInfoCommand command = new(TestHelper.CreateManifestJsonService());
+            MergeImageInfoCommand command = new(TestHelper.CreateManifestJsonService(), TestHelper.CreateRealImageInfoService());
             command.Options.SourceImageInfoFolderPath = Path.Combine(tempFolderContext.Path, "image-infos");
             command.Options.DestinationImageInfoPath = Path.Combine(tempFolderContext.Path, "output.json");
             command.Options.Manifest = Path.Combine(tempFolderContext.Path, "manifest.json");
@@ -1118,7 +1118,7 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
 
             var outputImageInfoFile = Path.Combine(context.Path, "merged-image-info.json");
 
-            MergeImageInfoCommand command = new MergeImageInfoCommand(TestHelper.CreateManifestJsonService());
+            MergeImageInfoCommand command = new MergeImageInfoCommand(TestHelper.CreateManifestJsonService(), TestHelper.CreateRealImageInfoService());
             command.Options.SourceImageInfoFolderPath = sourceImageInfoDir;
             command.Options.DestinationImageInfoPath = outputImageInfoFile;
             command.Options.InitialImageInfoPath = initialImageInfoFile;

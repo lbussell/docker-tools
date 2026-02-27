@@ -16,20 +16,23 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
     public class CopyAcrImagesCommand : CopyImagesCommand<CopyAcrImagesOptions, CopyAcrImagesOptionsBuilder>
     {
         private readonly ILogger _logger;
+        private readonly IImageInfoService _imageInfoService;
         private readonly Lazy<ImageArtifactDetails> _imageArtifactDetails;
 
         public CopyAcrImagesCommand(
             IManifestJsonService manifestJsonService,
             ICopyImageService copyImageService,
-            ILogger<CopyAcrImagesCommand> logger)
+            ILogger<CopyAcrImagesCommand> logger,
+            IImageInfoService imageInfoService)
             : base(manifestJsonService, copyImageService, logger)
         {
+            _imageInfoService = imageInfoService ?? throw new ArgumentNullException(nameof(imageInfoService));
             _logger = logger;
             _imageArtifactDetails = new Lazy<ImageArtifactDetails>(() =>
             {
                 if (!string.IsNullOrEmpty(Options.ImageInfoPath))
                 {
-                    return ImageInfoHelper.LoadFromFile(Options.ImageInfoPath, Manifest);
+                    return _imageInfoService.LoadFromFile(Options.ImageInfoPath, Manifest);
                 }
 
                 return null;
