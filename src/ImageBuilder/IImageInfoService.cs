@@ -9,11 +9,13 @@ namespace Microsoft.DotNet.ImageBuilder;
 
 /// <summary>
 /// Loads and deserializes image info JSON files (<c>image-info.json</c>) into
-/// <see cref="ImageArtifactDetails"/> models, optionally associating them with manifest metadata.
+/// <see cref="ImageArtifactDetails"/> models, optionally associating them with manifest metadata
+/// via <see cref="ImageArtifactContext"/>.
 /// </summary>
 /// <remarks>
 /// Image info files are ImageBuilder's output describing which images were built — their digests,
-/// tags, Dockerfile paths, and build timestamps. This service handles reading those files from disk.
+/// tags, Dockerfile paths, and build timestamps. This service handles reading those files from disk
+/// and building contexts that associate the data with manifest definitions.
 /// For pure in-memory operations on image info data (merging, querying, etc.), see <see cref="ImageInfoHelper"/>.
 /// </remarks>
 public interface IImageInfoService
@@ -37,6 +39,41 @@ public interface IImageInfoService
     /// <param name="useFilteredManifest">Whether to use the filtered content of the manifest for lookups.</param>
     /// <returns>The deserialized and manifest-associated <see cref="ImageArtifactDetails"/>.</returns>
     ImageArtifactDetails LoadFromFile(
+        string path,
+        ManifestInfo manifest,
+        bool skipManifestValidation = false,
+        bool useFilteredManifest = false);
+
+    /// <summary>
+    /// Builds an <see cref="ImageArtifactContext"/> by associating existing <see cref="ImageArtifactDetails"/>
+    /// with manifest metadata. No file I/O is performed.
+    /// </summary>
+    /// <param name="details">The image artifact details to associate.</param>
+    /// <param name="manifest">The manifest to associate with the image info.</param>
+    /// <param name="skipManifestValidation">
+    /// Whether to skip validation if no associated manifest model item was found for a given image info model item.
+    /// </param>
+    /// <param name="useFilteredManifest">Whether to use the filtered content of the manifest for lookups.</param>
+    /// <returns>A context containing the details and ViewModel association lookups.</returns>
+    ImageArtifactContext CreateContext(
+        ImageArtifactDetails details,
+        ManifestInfo manifest,
+        bool skipManifestValidation = false,
+        bool useFilteredManifest = false);
+
+    /// <summary>
+    /// Loads an image info file from disk and builds an <see cref="ImageArtifactContext"/>
+    /// associating it with manifest metadata. Convenience method combining
+    /// <see cref="DeserializeImageArtifactDetails"/> and <see cref="CreateContext"/>.
+    /// </summary>
+    /// <param name="path">Path to the image info file.</param>
+    /// <param name="manifest">The manifest to associate with the loaded image info.</param>
+    /// <param name="skipManifestValidation">
+    /// Whether to skip validation if no associated manifest model item was found for a given image info model item.
+    /// </param>
+    /// <param name="useFilteredManifest">Whether to use the filtered content of the manifest for lookups.</param>
+    /// <returns>A context containing the deserialized details and ViewModel association lookups.</returns>
+    ImageArtifactContext LoadContext(
         string path,
         ManifestInfo manifest,
         bool skipManifestValidation = false,

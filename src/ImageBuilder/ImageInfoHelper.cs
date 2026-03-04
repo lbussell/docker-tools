@@ -208,7 +208,7 @@ namespace Microsoft.DotNet.ImageBuilder
             MergeData(src, target, options);
         }
 
-        private static bool ArePlatformsEqual(PlatformData platformData, ImageData imageData, PlatformInfo platform, ImageInfo manifestImage)
+        internal static bool ArePlatformsEqual(PlatformData platformData, ImageData imageData, PlatformInfo platform, ImageInfo manifestImage)
         {
             PlatformData otherPlatform = PlatformData.FromPlatformInfo(platform, manifestImage);
             // We can't use PlatformData.CompareTo here because it relies on having its PlatformInfo and ImageInfo values fully populated
