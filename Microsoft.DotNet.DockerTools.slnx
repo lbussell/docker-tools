@@ -6,7 +6,7 @@
   </Configurations>
   <Project Path="eng/src/file-pusher/file-pusher.csproj" />
   <Project Path="eng/src/yaml-updater/yaml-updater.csproj" />
-  <Project Path="src/DockerTools.Automation/Microsoft.DotNet.DockerTools.Automation.csproj" />
+  <Project Path="src/Automation/Microsoft.DotNet.DockerTools.Automation.csproj" />
   <Project Path="src/ImageBuilder/Microsoft.DotNet.ImageBuilder.csproj" />
   <Project Path="src/ImageBuilder.Models/Microsoft.DotNet.ImageBuilder.Models.csproj" />
   <Project Path="src/ImageBuilder.Tests/Microsoft.DotNet.ImageBuilder.Tests.csproj" />
