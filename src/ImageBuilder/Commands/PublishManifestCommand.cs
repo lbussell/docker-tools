@@ -60,7 +60,8 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
                 return;
             }
 
-            ImageArtifactDetails imageArtifactDetails = _imageInfoService.LoadFromFile(Options.ImageInfoPath, Manifest);
+            ImageArtifactContext imageArtifactContext = _imageInfoService.LoadContext(Options.ImageInfoPath, Manifest);
+            ImageArtifactDetails imageArtifactDetails = imageArtifactContext.Details;
 
             await _registryCredentialsProvider.ExecuteWithCredentialsAsync(
                 Options.IsDryRun,
@@ -91,13 +92,13 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
 
                     WriteManifestSummary();
 
-                    await SaveTagInfoToImageInfoFileAsync(createdDate, imageArtifactDetails);
+                    await SaveTagInfoToImageInfoFileAsync(createdDate, imageArtifactDetails, imageArtifactContext);
                 },
                 Options.CredentialsOptions,
                 registryName: Manifest.Registry);
         }
 
-        private async Task SaveTagInfoToImageInfoFileAsync(DateTime createdDate, ImageArtifactDetails imageArtifactDetails)
+        private async Task SaveTagInfoToImageInfoFileAsync(DateTime createdDate, ImageArtifactDetails imageArtifactDetails, ImageArtifactContext context)
         {
             _logger.LogInformation("SETTING TAG INFO");
 
@@ -111,8 +112,11 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
 
                 TagInfo sharedTag = image.ManifestImage.SharedTags.First();
 
+                var manifestRepo = context.GetManifestRepo(image)
+                    ?? throw new InvalidOperationException($"No manifest repo found for image with product version '{image.ProductVersion}'.");
+
                 image.Manifest.Digest = DockerHelper.GetDigestString(
-                    image.ManifestRepo.FullModelName,
+                    manifestRepo.FullModelName,
                     await _manifestService.Value.GetManifestDigestShaAsync(
                         sharedTag.FullyQualifiedName, Options.IsDryRun));
 
