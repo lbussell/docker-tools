@@ -110,7 +110,10 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
             {
                 image.Manifest.Created = createdDate;
 
-                TagInfo sharedTag = image.ManifestImage.SharedTags.First();
+                var manifestImage = context.GetManifestImage(image)
+                    ?? throw new InvalidOperationException($"No manifest image found for image with product version '{image.ProductVersion}'.");
+
+                TagInfo sharedTag = manifestImage.SharedTags.First();
 
                 var manifestRepo = context.GetManifestRepo(image)
                     ?? throw new InvalidOperationException($"No manifest repo found for image with product version '{image.ProductVersion}'.");
@@ -120,7 +123,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
                     await _manifestService.Value.GetManifestDigestShaAsync(
                         sharedTag.FullyQualifiedName, Options.IsDryRun));
 
-                IEnumerable<(string Repo, string Tag)> syndicatedRepresentativeSharedTags = image.ManifestImage.SharedTags
+                IEnumerable<(string Repo, string Tag)> syndicatedRepresentativeSharedTags = manifestImage.SharedTags
                     .Where(tag => tag.SyndicatedRepo is not null)
                     .GroupBy(tag => tag.SyndicatedRepo)
                     .Select(group => (group.Key, group.First().SyndicatedDestinationTags.First()))

@@ -42,8 +42,8 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
 
             if (!Options.IsDryRun)
             {
-                ImageArtifactDetails imageArtifactDetails = _imageInfoService.LoadFromFile(Options.ImageInfoPath, Manifest);
-                IEnumerable<DigestInfo> imageInfos = GetImageDigestInfos(imageArtifactDetails);
+                ImageArtifactContext imageArtifactContext = _imageInfoService.LoadContext(Options.ImageInfoPath, Manifest);
+                IEnumerable<DigestInfo> imageInfos = GetImageDigestInfos(imageArtifactContext);
                 await _imageIngestionReporter.ReportImageStatusesAsync(
                     Options.MarServiceConnection,
                     imageInfos,
@@ -53,11 +53,11 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
             }
         }
 
-        private IEnumerable<DigestInfo> GetImageDigestInfos(ImageArtifactDetails imageArtifactDetails) =>
-            imageArtifactDetails.Repos
-                .SelectMany(repo => repo.Images.SelectMany(image => GetImageDigestInfos(image, repo)));
+        private IEnumerable<DigestInfo> GetImageDigestInfos(ImageArtifactContext context) =>
+            context.Details.Repos
+                .SelectMany(repo => repo.Images.SelectMany(image => GetImageDigestInfos(image, repo, context)));
 
-        private IEnumerable<DigestInfo> GetImageDigestInfos(ImageData image, RepoData repo)
+        private IEnumerable<DigestInfo> GetImageDigestInfos(ImageData image, RepoData repo, ImageArtifactContext context)
         {
             if (image.Manifest?.Digest != null)
             {
@@ -65,7 +65,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
                 yield return new DigestInfo(digestSha, Options.RepoPrefix + repo.Repo, image.Manifest.SharedTags);
 
                 // Find all syndicated shared tags grouped by their syndicated repo
-                IEnumerable<IGrouping<string, TagInfo>> syndicatedTagGroups = image.ManifestImage.SharedTags
+                IEnumerable<IGrouping<string, TagInfo>> syndicatedTagGroups = (context.GetManifestImage(image)?.SharedTags ?? Enumerable.Empty<TagInfo>())
                     .Where(tag => image.Manifest.SharedTags.Contains(tag.Name) && tag.SyndicatedRepo != null)
                     .GroupBy(tag => tag.SyndicatedRepo);
 

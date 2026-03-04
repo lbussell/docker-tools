@@ -307,23 +307,23 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
         {
             _logger.LogInformation("BUILDING IMAGES");
 
-            ImageArtifactDetails? srcImageArtifactDetails = null;
+            ImageArtifactContext? srcContext = null;
             if (Options.ImageInfoSourcePath != null)
             {
-                srcImageArtifactDetails = _imageInfoService.LoadFromFile(Options.ImageInfoSourcePath, Manifest, skipManifestValidation: true);
+                srcContext = _imageInfoService.LoadContext(Options.ImageInfoSourcePath, Manifest, skipManifestValidation: true);
             }
 
             foreach (RepoInfo repoInfo in Manifest.FilteredRepos)
             {
                 RepoData repoData = CreateRepoData(repoInfo);
-                RepoData? srcRepoData = srcImageArtifactDetails?.Repos.FirstOrDefault(srcRepo => srcRepo.Repo == repoInfo.Name);
+                RepoData? srcRepoData = srcContext?.Details.Repos.FirstOrDefault(srcRepo => srcRepo.Repo == repoInfo.Name);
 
                 foreach (ImageInfo image in repoInfo.FilteredImages)
                 {
                     ImageData imageData = CreateImageData(image);
                     repoData.Images.Add(imageData);
 
-                    ImageData? srcImageData = srcRepoData?.Images.FirstOrDefault(srcImage => srcImage.ManifestImage == image);
+                    ImageData? srcImageData = srcRepoData?.Images.FirstOrDefault(srcImage => srcContext?.GetManifestImage(srcImage) == image);
 
                     foreach (PlatformInfo platform in image.FilteredPlatforms)
                     {
