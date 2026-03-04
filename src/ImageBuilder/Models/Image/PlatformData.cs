@@ -66,10 +66,6 @@ namespace Microsoft.DotNet.ImageBuilder.Models.Image
         [JsonIgnore]
         public PlatformInfo? PlatformInfo { get; set; }
 
-        [JsonIgnore]
-        public IEnumerable<TagInfo> AllTags =>
-            ImageInfo?.SharedTags.Union(PlatformInfo?.Tags ?? Enumerable.Empty<TagInfo>()) ?? Enumerable.Empty<TagInfo>();
-
         public int CompareTo([AllowNull] PlatformData other)
         {
             if (other is null)
