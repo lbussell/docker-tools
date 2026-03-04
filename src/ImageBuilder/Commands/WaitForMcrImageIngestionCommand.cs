@@ -96,7 +96,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
                 yield return new DigestInfo(sha, Options.RepoPrefix + repo.Repo, platform.SimpleTags);
 
                 // Find all syndicated simple tags grouped by their syndicated repo
-                IEnumerable<IGrouping<string, TagInfo>> syndicatedTagGroups = (platform.PlatformInfo?.Tags ?? Enumerable.Empty<TagInfo>())
+                IEnumerable<IGrouping<string, TagInfo>> syndicatedTagGroups = (context.GetPlatformInfo(platform)?.Tags ?? Enumerable.Empty<TagInfo>())
                     .Where(tagInfo => platform.SimpleTags.Contains(tagInfo.Name) && tagInfo.SyndicatedRepo != null)
                     .GroupBy(tagInfo => tagInfo.SyndicatedRepo);
 

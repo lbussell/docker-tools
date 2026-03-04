@@ -237,10 +237,10 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
                 return Enumerable.Empty<string>();
             }
 
-            ImageArtifactDetails imageArtifactDetails = _imageInfoService.LoadFromFile(Options.ImageInfoPath, Manifest);
+            ImageArtifactContext context = _imageInfoService.LoadContext(Options.ImageInfoPath, Manifest);
 
             List<(string digestSha, string repo, IEnumerable<string> tags)> imageInfos = new();
-            foreach (RepoData repoData in imageArtifactDetails.Repos)
+            foreach (RepoData repoData in context.Details.Repos)
             {
                 foreach (ImageData image in repoData.Images)
                 {
@@ -252,7 +252,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
 
                     imageInfos.AddRange(
                         image.Platforms
-                            .Where(platform => platform.PlatformInfo?.Tags.Any() == true)
+                            .Where(platform => context.GetPlatformInfo(platform)?.Tags.Any() == true)
                             .Select(platform =>
                             {
                                 string digestSha = DockerHelper.GetDigestSha(platform.Digest);

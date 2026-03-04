@@ -17,7 +17,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
     {
         private readonly ILogger _logger;
         private readonly IImageInfoService _imageInfoService;
-        private readonly Lazy<ImageArtifactDetails> _imageArtifactDetails;
+        private readonly Lazy<ImageArtifactContext> _imageArtifactContext;
 
         public CopyAcrImagesCommand(
             IManifestJsonService manifestJsonService,
@@ -28,11 +28,11 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
         {
             _imageInfoService = imageInfoService ?? throw new ArgumentNullException(nameof(imageInfoService));
             _logger = logger;
-            _imageArtifactDetails = new Lazy<ImageArtifactDetails>(() =>
+            _imageArtifactContext = new Lazy<ImageArtifactContext>(() =>
             {
                 if (!string.IsNullOrEmpty(Options.ImageInfoPath))
                 {
-                    return _imageInfoService.LoadFromFile(Options.ImageInfoPath, Manifest);
+                    return _imageInfoService.LoadContext(Options.ImageInfoPath, Manifest);
                 }
 
                 return null;
@@ -76,14 +76,14 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
             // to handle scenarios where the tag's value is dynamic, such as a timestamp, and we need to know the value
             // of the tag for the image that was actually built rather than just generating new tag values when parsing
             // the manifest.
-            if (_imageArtifactDetails.Value != null)
+            if (_imageArtifactContext.Value != null)
             {
-                RepoData repoData = _imageArtifactDetails.Value.Repos.FirstOrDefault(repoData => repoData.Repo == repo.Name);
+                RepoData repoData = _imageArtifactContext.Value.Details.Repos.FirstOrDefault(repoData => repoData.Repo == repo.Name);
                 if (repoData != null)
                 {
                     PlatformData platformData = repoData.Images
                         .SelectMany(image => image.Platforms)
-                        .FirstOrDefault(platformData => platformData.PlatformInfo == platform);
+                        .FirstOrDefault(platformData => _imageArtifactContext.Value.GetPlatformInfo(platformData) == platform);
                     if (platformData != null)
                     {
                         foreach (string tag in platformData.SimpleTags)
@@ -92,7 +92,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
                             string sourceTag = GetSourceTag(destinationTag);
                             tags.Add((sourceTag, destinationTag));
 
-                            TagInfo tagInfo = platformData.PlatformInfo.Tags.FirstOrDefault(tagInfo => tagInfo.Name == tag);
+                            TagInfo tagInfo = _imageArtifactContext.Value.GetPlatformInfo(platformData)?.Tags.FirstOrDefault(tagInfo => tagInfo.Name == tag);
                             // There may not be a matching tag due to dynamic tag names. For now, we'll say that
                             // syndication is not supported for dynamically named tags.
                             // See https://github.com/dotnet/docker-tools/issues/686
