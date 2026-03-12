@@ -8,49 +8,133 @@
 using System.Net.Http.Headers;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 using Azure.Core;
 using Azure.Identity;
+using static System.Console;
 
-const string org = "dnceng";
-const string project = "internal";
-const string folder = @"\dotnet\docker-tools";
-const string scope = "499b84ac-1321-427f-aa17-267ca6975798/.default";
+using AzureDevOpsClient client = AzureDevOpsClient.Create(org: "dnceng", project: "internal");
 
-// Authenticate using Azure Developer CLI credential (same as the monitor project).
-// Requires prior `azd auth login`.
-AzureDeveloperCliCredential credential = new();
-AccessToken token = credential.GetToken(new([scope]), CancellationToken.None);
-
-using HttpClient http = new();
-http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token.Token);
-
-string url = $"https://dev.azure.com/{org}/{project}/_apis/build/definitions"
-    + $"?path={Uri.EscapeDataString(folder)}&includeLatestBuilds=true&api-version=7.1";
-
-string json = await http.GetStringAsync(url);
-DefinitionsResponse response =
-    JsonSerializer.Deserialize(json, AzureDevOpsJsonContext.Default.DefinitionsResponse)
-    ?? throw new InvalidOperationException("Failed to deserialize API response.");
-
-List<BuildDefinitionReference> failing = response
-    .Value.Where(def => def.LatestCompletedBuild is { Result: "failed" })
+DefinitionsResponse buildDefinitions = await client.GetBuildDefinitionsAsync(@"\dotnet\docker-tools");
+List<BuildDefinitionReference> failingBuilds = buildDefinitions
+    .Value.Where(definition => definition.LatestCompletedBuild is { Result: "failed" })
     .ToList();
 
-if (failing.Count == 0)
+if (failingBuilds.Count == 0)
 {
-    Console.WriteLine("No failing pipelines found.");
+    WriteLine("No failing pipelines found.");
     return;
 }
 
-Console.WriteLine($"Found {failing.Count} failing pipeline(s):\n");
+WriteLine($"Found {failingBuilds.Count} failing pipeline(s):\n");
 
-foreach (BuildDefinitionReference def in failing)
+foreach (BuildDefinitionReference def in failingBuilds)
 {
     ApiBuild build = def.LatestCompletedBuild!;
-    Console.WriteLine($"Pipeline: {def.Name}");
-    Console.WriteLine($"  Commit: {build.SourceVersion ?? "unknown"}");
-    Console.WriteLine($"  Link:   https://dev.azure.com/{org}/{project}/_build/results?buildId={build.Id}");
-    Console.WriteLine();
+    WriteLine($"Pipeline: {def.Name}");
+    WriteLine($"  Commit: {build.SourceVersion ?? "unknown"}");
+    WriteLine($"  Link:   {client.GetBuildResultUrl(build.Id)}");
+    WriteLine();
+}
+
+/// <summary>
+/// Convenience extension methods for common Azure DevOps API calls.
+/// </summary>
+static class AzureDevOpsExtensions
+{
+    /// <summary>
+    /// Returns the build definitions in the specified folder, with their latest completed builds.
+    /// </summary>
+    /// <param name="folder">The pipeline folder path (e.g., <c>\dotnet\docker-tools</c>).</param>
+    public static async Task<DefinitionsResponse> GetBuildDefinitionsAsync(
+        this AzureDevOpsClient client, string folder) =>
+        await client.GetAsJsonAsync(
+            "_apis/build/definitions",
+            AzureDevOpsJsonContext.Default.DefinitionsResponse,
+            new() { ["path"] = folder, ["includeLatestBuilds"] = "true" });
+}
+
+/// <summary>
+/// A lightweight client for calling Azure DevOps REST APIs.
+/// Authenticates via <see cref="AzureDeveloperCliCredential"/> (requires prior <c>azd auth login</c>).
+/// </summary>
+sealed class AzureDevOpsClient : IDisposable
+{
+    private const string Scope = "499b84ac-1321-427f-aa17-267ca6975798/.default";
+    private const string ApiVersion = "7.1";
+
+    private readonly HttpClient _http;
+
+    /// <summary>The Azure DevOps organization name.</summary>
+    public string Org { get; }
+
+    /// <summary>The Azure DevOps project name.</summary>
+    public string Project { get; }
+
+    private AzureDevOpsClient(HttpClient http, string org, string project)
+    {
+        _http = http;
+        Org = org;
+        Project = project;
+    }
+
+    /// <summary>
+    /// Creates an authenticated client for the specified Azure DevOps organization and project.
+    /// </summary>
+    public static AzureDevOpsClient Create(string org = "dnceng", string project = "internal")
+    {
+        AzureDeveloperCliCredential credential = new();
+        AccessToken token = credential.GetToken(new([Scope]), CancellationToken.None);
+
+        HttpClient http = new()
+        {
+            BaseAddress = new Uri($"https://dev.azure.com/{org}/{project}/")
+        };
+        http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token.Token);
+
+        return new AzureDevOpsClient(http, org, project);
+    }
+
+    /// <summary>
+    /// Sends a GET request to the specified API path and deserializes the JSON response.
+    /// The <c>api-version</c> query parameter is appended automatically.
+    /// </summary>
+    /// <param name="path">API path relative to the project URL (e.g., <c>_apis/build/definitions</c>).</param>
+    /// <param name="jsonTypeInfo">Source-generated JSON type info for deserialization.</param>
+    /// <param name="queryParams">Optional query parameters to append to the URL.</param>
+    public async Task<T> GetAsJsonAsync<T>(
+        string path,
+        JsonTypeInfo<T> jsonTypeInfo,
+        Dictionary<string, string>? queryParams = null)
+    {
+        string query = BuildQueryString(queryParams);
+        string url = $"{path}?{query}";
+        string json = await _http.GetStringAsync(url);
+        return JsonSerializer.Deserialize(json, jsonTypeInfo)
+            ?? throw new InvalidOperationException($"Failed to deserialize response from {path}.");
+    }
+
+    /// <summary>
+    /// Returns the web UI URL for a specific build result.
+    /// </summary>
+    public string GetBuildResultUrl(int buildId) =>
+        $"https://dev.azure.com/{Org}/{Project}/_build/results?buildId={buildId}";
+
+    private static string BuildQueryString(Dictionary<string, string>? queryParams)
+    {
+        List<string> parts = [$"api-version={ApiVersion}"];
+        if (queryParams is not null)
+        {
+            foreach ((string key, string value) in queryParams)
+            {
+                parts.Add($"{Uri.EscapeDataString(key)}={Uri.EscapeDataString(value)}");
+            }
+        }
+        return string.Join("&", parts);
+    }
+
+    /// <inheritdoc/>
+    public void Dispose() => _http.Dispose();
 }
 
 /// <summary>
