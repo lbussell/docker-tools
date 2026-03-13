@@ -6,8 +6,8 @@
 #:project ../../../../src/Skills/Skills.csproj
 
 using System.CommandLine;
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
-using System.Text.RegularExpressions;
 using Microsoft.DotNet.DockerTools.Skills;
 using static Spectre.Console.AnsiConsole;
 
@@ -36,7 +36,7 @@ string pr = parseResult.GetValue(pullRequestArgument)!;
 string? repo = parseResult.GetValue(repoOption);
 bool showAll = parseResult.GetValue(showAllOption);
 
-// Get check runs for the PR via gh pr checks.
+// Get check runs for the PR via `gh pr checks`.
 // When --repo isn't set, gh auto-detects from the current git remote.
 List<string> checksArgs = ["pr", "checks", pr, "--json", "name,link"];
 if (repo is not null)
@@ -54,21 +54,16 @@ foreach (JsonElement check in checksJson.RootElement.EnumerateArray())
 {
     string link = check.GetProperty("link").GetString() ?? "";
 
-    if (!TryParseAzureDevOpsUrl(link, out string? org, out string? project, out int buildId)
-        || org is null || project is null)
-    {
+    if (!TryParseAzureDevOpsUrl(link, out string? org, out string? project, out int buildId))
         continue;
-    }
 
-    string name = check.GetProperty("name").GetString() ?? "";
+    string checkName = check.GetProperty("name").GetString() ?? "";
 
     // The top-level pipeline check run has no job suffix in parentheses
-    bool isTopLevel = !name.Contains(" (");
+    bool isTopLevel = !checkName.Contains(" (");
 
     if (!pipelines.TryGetValue(buildId, out PipelineRun? existing) || (isTopLevel && !existing.IsTopLevel))
-    {
-        pipelines[buildId] = new PipelineRun(name, buildId, org, project, isTopLevel);
-    }
+        pipelines[buildId] = new PipelineRun(checkName, buildId, org, project, isTopLevel);
 }
 
 if (pipelines.Count == 0)
@@ -123,28 +118,27 @@ static async Task<JsonDocument> RunGhJsonAsync(params IEnumerable<string> argume
 /// Parses an Azure DevOps build URL to extract the org, project, and build ID.
 /// Expected format: <c>https://dev.azure.com/{org}/{project}/_build/results?buildId={id}</c>
 /// </summary>
-static bool TryParseAzureDevOpsUrl(string url, out string? org, out string? project, out int buildId)
+static bool TryParseAzureDevOpsUrl(
+    string url,
+    [NotNullWhen(true)] out string? org,
+    [NotNullWhen(true)] out string? project,
+    out int buildId)
 {
     org = null;
     project = null;
     buildId = 0;
 
-    Match match = Regex.Match(url, @"^https://dev\.azure\.com/([^/]+)/([^/]+)/_build/results");
-    if (!match.Success)
+    if (!Uri.TryCreate(url, UriKind.Absolute, out Uri? uri)
+        || uri.Host is not "dev.azure.com"
+        || uri.Segments.Length < 4) // Expects 4 segments: ["/", "org/", "project/", "_build/", "results"]
     {
         return false;
     }
 
-    org = match.Groups[1].Value;
-    project = match.Groups[2].Value;
+    org = uri.Segments[1].TrimEnd('/');
+    project = uri.Segments[2].TrimEnd('/');
 
-    int queryStart = url.IndexOf('?');
-    if (queryStart < 0)
-    {
-        return false;
-    }
-
-    foreach (string param in url[(queryStart + 1)..].Split('&'))
+    foreach (string param in uri.Query.TrimStart('?').Split('&'))
     {
         string[] parts = param.Split('=', 2);
         if (parts.Length == 2 && parts[0] == "buildId")
