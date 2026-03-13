@@ -40,8 +40,8 @@ bool showAll = parseResult.GetValue(showAllOption);
 List<string> repoArgs = repo is not null ? ["--repo", repo] : [];
 
 // Fetch PR metadata and check runs in parallel
-List<string> prViewArgs = ["pr", "view", pr, "--json", "title,headRefName", .. repoArgs];
-List<string> checksArgs = ["pr", "checks", pr, "--json", "name,link", .. repoArgs];
+List<string> prViewArgs = ["pr", "view", pr, "--json", "title,headRefName,headRepositoryOwner,headRepository,author", .. repoArgs];
+List<string> checksArgs = ["pr", "checks", pr, "--json", "name,link,state", .. repoArgs];
 
 Task<JsonDocument> prInfoTask = RunGhJsonAsync([.. prViewArgs]);
 Task<JsonDocument> checksTask = RunGhJsonAsync([.. checksArgs]);
@@ -51,22 +51,32 @@ using JsonDocument checksJson = await checksTask;
 
 string prTitle = prInfo.RootElement.GetProperty("title").GetString() ?? "";
 string prBranch = prInfo.RootElement.GetProperty("headRefName").GetString() ?? "";
-WriteLine($"PR: {prTitle}");
-WriteLine($"Branch: {prBranch}");
+string prAuthor = prInfo.RootElement.GetProperty("author").GetProperty("login").GetString() ?? "";
+string forkOwner = prInfo.RootElement.GetProperty("headRepositoryOwner").GetProperty("login").GetString() ?? "";
+string forkRepo = prInfo.RootElement.GetProperty("headRepository").GetProperty("name").GetString() ?? "";
+
+WriteLine($"# Pull Request: {prTitle}");
+WriteLine();
+WriteLine($"- Author: {prAuthor}");
+WriteLine($"- Fork: {forkOwner}/{forkRepo}");
+WriteLine($"- Branch: {prBranch}");
 WriteLine();
 
-// Group by build ID, keeping the top-level pipeline entry.
-// Each Azure Pipelines run reports multiple check runs (one per job).
+// Separate Azure Pipelines check runs from other checks (e.g., GitHub Actions, CLA bots).
 Dictionary<int, PipelineRun> pipelines = [];
+List<(string Name, string State, string Link)> otherChecks = [];
 
 foreach (JsonElement check in checksJson.RootElement.EnumerateArray())
 {
     string link = check.GetProperty("link").GetString() ?? "";
+    string checkName = check.GetProperty("name").GetString() ?? "";
+    string state = check.GetProperty("state").GetString() ?? "";
 
     if (!TryParseAzureDevOpsUrl(link, out string? org, out string? project, out int buildId))
+    {
+        otherChecks.Add((checkName, state, link));
         continue;
-
-    string checkName = check.GetProperty("name").GetString() ?? "";
+    }
 
     // The top-level pipeline check run has no job suffix in parentheses
     bool isTopLevel = !checkName.Contains(" (");
@@ -75,9 +85,9 @@ foreach (JsonElement check in checksJson.RootElement.EnumerateArray())
         pipelines[buildId] = new PipelineRun(checkName, buildId, org, project, isTopLevel);
 }
 
-if (pipelines.Count == 0)
+if (pipelines.Count == 0 && otherChecks.Count == 0)
 {
-    WriteLine("No Azure Pipelines runs found for this pull request.");
+    WriteLine("No checks found for this pull request.");
     return 0;
 }
 
@@ -89,6 +99,14 @@ Func<TimelineNode, bool>? filter = showAll
 IEnumerable<IGrouping<(string Org, string Project), PipelineRun>> groups =
     pipelines.Values.GroupBy(p => (p.Org, p.Project));
 
+WriteLine("## Azure Pipelines Checks");
+WriteLine();
+if (!groups.Any())
+{
+    WriteLine("No Azure Pipelines runs found for this pull request.");
+    WriteLine();
+}
+
 foreach (IGrouping<(string Org, string Project), PipelineRun> group in groups)
 {
     using AzureDevOpsClient client = AzureDevOpsClient.Create(org: group.Key.Org, project: group.Key.Project);
@@ -99,11 +117,12 @@ foreach (IGrouping<(string Org, string Project), PipelineRun> group in groups)
         TimelineResponse timeline = await client.GetBuildTimelineAsync(pipeline.BuildId);
         IReadOnlyList<TimelineNode> roots = timeline.BuildTree();
 
-        string label = $"{build.Definition.Name} - Build {pipeline.BuildId} ({client.GetBuildResultUrl(pipeline.BuildId)}):";
+        string buildResultUrl = client.GetBuildResultUrl(pipeline.BuildId);
+        string label = $"Azure Pipelines: {build.Definition.Name} - Build {pipeline.BuildId} ({buildResultUrl}):";
 
         if (roots.Count == 0)
         {
-            MarkupLine($"[dim]{label} (no timeline records)[/]");
+            WriteLine($"{label} (no timeline records)");
         }
         else
         {
@@ -115,13 +134,36 @@ foreach (IGrouping<(string Org, string Project), PipelineRun> group in groups)
     }
 }
 
+if (otherChecks.Count > 0)
+{
+    WriteLine("## Other Checks");
+    WriteLine();
+    WriteLine("| Check | Result | URL |");
+    foreach ((string name, string state, string link) in otherChecks.OrderBy(c => c.Name))
+    {
+        string statusText = state switch
+        {
+            "SUCCESS" => "OK",
+            "FAILURE" => "FAIL",
+            "PENDING" or "EXPECTED" => "PENDING",
+            _ => state,
+        };
+        WriteLine($"| {name} | {statusText} | {link} |");
+    }
+    WriteLine();
+}
+
 return 0;
 
 /// <summary>
 /// Runs a gh CLI command and parses the output as a JSON document.
 /// </summary>
-static async Task<JsonDocument> RunGhJsonAsync(params IEnumerable<string> arguments) =>
-    JsonDocument.Parse(await ProcessHelper.RunAsync("gh", arguments.ToArray()));
+static async Task<JsonDocument> RunGhJsonAsync(params IEnumerable<string> arguments)
+{
+    string response = await ProcessHelper.RunAsync("gh", arguments.ToArray());
+    JsonDocument responseJson = JsonDocument.Parse(response);
+    return responseJson ?? throw new InvalidOperationException("Failed to parse JSON response.");
+}
 
 /// <summary>
 /// Parses an Azure DevOps build URL to extract the org, project, and build ID.
