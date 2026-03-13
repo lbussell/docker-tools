@@ -76,6 +76,19 @@ public sealed class AzureDevOpsClient : IDisposable
     }
 
     /// <summary>
+    /// Sends a GET request to the specified API path and returns the response body as a string.
+    /// The <c>api-version</c> query parameter is appended automatically.
+    /// </summary>
+    /// <param name="path">API path relative to the project URL.</param>
+    /// <param name="queryParams">Optional query parameters to append to the URL.</param>
+    public async Task<string> GetAsTextAsync(string path, Dictionary<string, string>? queryParams = null)
+    {
+        string query = BuildQueryString(queryParams);
+        string url = $"{path}?{query}";
+        return await _http.GetStringAsync(url);
+    }
+
+    /// <summary>
     /// Returns the web UI URL for a specific build result.
     /// </summary>
     public string GetBuildResultUrl(int buildId) =>

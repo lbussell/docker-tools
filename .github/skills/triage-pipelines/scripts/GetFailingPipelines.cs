@@ -5,8 +5,12 @@
 
 #:project common/TriagePipelines.csproj
 
+using System.CommandLine;
 using TriagePipelines;
 using static System.Console;
+
+RootCommand rootCommand = new("Lists failing pipelines in the dotnet docker-tools folder.");
+rootCommand.Parse(args);
 
 using AzureDevOpsClient client = AzureDevOpsClient.Create();
 
