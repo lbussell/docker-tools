@@ -10,17 +10,24 @@ using TriagePipelines;
 
 Argument<int> buildIdArgument = new("buildId") { Description = "The build ID to fetch the log from." };
 Argument<int> logIdArgument = new("logId") { Description = "The log ID to fetch." };
+Option<string> projectOption = new("--project", "-p")
+{
+    Description = "The Azure DevOps project (e.g., internal, public).",
+    DefaultValueFactory = _ => "internal"
+};
 
 RootCommand rootCommand = new("Fetches a task log from an Azure DevOps build.")
 {
     buildIdArgument,
-    logIdArgument
+    logIdArgument,
+    projectOption
 };
 
 ParseResult parseResult = rootCommand.Parse(args);
 int buildId = parseResult.GetValue(buildIdArgument);
 int logId = parseResult.GetValue(logIdArgument);
+string project = parseResult.GetValue(projectOption);
 
-using AzureDevOpsClient client = AzureDevOpsClient.Create();
+using AzureDevOpsClient client = AzureDevOpsClient.Create(project: project);
 string logContent = await client.GetBuildLogContentAsync(buildId, logId);
 Console.Write(logContent);

@@ -9,12 +9,32 @@ using System.CommandLine;
 using TriagePipelines;
 using static System.Console;
 
-RootCommand rootCommand = new("Lists failing pipelines in the dotnet docker-tools folder.");
-rootCommand.Parse(args);
+Argument<string> folderArgument = new("folder")
+{
+    Description = "The Azure DevOps pipeline folder path (e.g., dotnet/docker-tools)."
+};
+Option<string> projectOption = new("--project", "-p")
+{
+    Description = "The Azure DevOps project (e.g., internal, public).",
+    DefaultValueFactory = _ => "internal"
+};
 
-using AzureDevOpsClient client = AzureDevOpsClient.Create();
+RootCommand rootCommand = new("Lists failing pipelines in an Azure DevOps pipeline folder.")
+{
+    folderArgument,
+    projectOption
+};
 
-DefinitionsResponse buildDefinitions = await client.GetBuildDefinitionsAsync(@"\dotnet\docker-tools");
+ParseResult parseResult = rootCommand.Parse(args);
+string folder = parseResult.GetValue(folderArgument);
+string project = parseResult.GetValue(projectOption);
+
+// Normalize to the backslash-prefixed format the API expects (e.g., \dotnet\docker-tools)
+folder = @"\" + folder.Trim('\\', '/').Replace('/', '\\');
+
+using AzureDevOpsClient client = AzureDevOpsClient.Create(project: project);
+
+DefinitionsResponse buildDefinitions = await client.GetBuildDefinitionsAsync(folder);
 List<BuildDefinitionReference> failingBuilds = buildDefinitions
     .Value.Where(definition => definition.LatestCompletedBuild is { Result: "failed" })
     .ToList();

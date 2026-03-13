@@ -10,22 +10,29 @@ using TriagePipelines;
 using static System.Console;
 
 Argument<int> buildIdArgument = new("buildId") { Description = "The build ID to fetch the timeline for." };
-Option<int> maxDepthOption = new("--max-depth") { Description = "Maximum tree depth to display.", DefaultValueFactory = _ => 2 };
+Option<int> maxDepthOption = new("--max-depth", "-d") { Description = "Maximum tree depth to display.", DefaultValueFactory = _ => 2 };
 Option<bool> failingOption = new("--failing") { Description = "Always display failing tasks, even beyond max depth." };
+Option<string> projectOption = new("--project", "-p")
+{
+    Description = "The Azure DevOps project (e.g., internal, public).",
+    DefaultValueFactory = _ => "internal"
+};
 
 RootCommand rootCommand = new("Displays the build timeline as a tree.")
 {
     buildIdArgument,
     maxDepthOption,
-    failingOption
+    failingOption,
+    projectOption
 };
 
 ParseResult parseResult = rootCommand.Parse(args);
 int buildId = parseResult.GetValue(buildIdArgument);
 int maxDepth = parseResult.GetValue(maxDepthOption);
 bool showFailing = parseResult.GetValue(failingOption);
+string project = parseResult.GetValue(projectOption);
 
-using AzureDevOpsClient client = AzureDevOpsClient.Create();
+using AzureDevOpsClient client = AzureDevOpsClient.Create(project: project);
 TimelineResponse timeline = await client.GetBuildTimelineAsync(buildId);
 IReadOnlyList<TimelineNode> roots = timeline.BuildTree();
 
