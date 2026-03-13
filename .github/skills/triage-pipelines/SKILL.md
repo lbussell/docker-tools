@@ -1,22 +1,19 @@
 ---
 name: triage-pipelines
-description: Get Azure Pipelines build information, failures, and logs.
+description: >-
+  Lists all failing Azure Pipelines in a folder for daily triage. Identifies pipelines where the
+  latest completed build has failed and provides links. Use for daily pipeline health checks across
+  a repository's pipeline folder.
 ---
 
-## How to investigate pipeline failures
+## Workflow
 
-All scripts default to the `internal` project. Use `--project public` (or `-p public`) to query the `public` project instead.
+### Step 1: List all failing pipelines
 
 ```shell
-# List all pipelines in this repo where the latest build is failing
 dotnet scripts/GetFailingPipelines.cs dotnet/docker-tools
-
-# Show all failing tasks in a pipeline
-dotnet scripts/GetBuildTimeline.cs 2999999 --failing
-
-# Show all stages, jobs, and tasks in a pipeline
-dotnet scripts/GetBuildTimeline.cs 2999999 -d 3
-
-# Get the log for a specific task in a pipeline
-dotnet scripts/GetTaskLog.cs 2999999 42
 ```
+
+### Step 2: Investigate each failure
+
+For each failing pipeline in the output, use the `investigating-pipeline` skill with the build ID to see the timeline and read task logs.
