@@ -118,6 +118,15 @@ public sealed class AzureDevOpsClient : IDisposable
             new() { ["path"] = folder, ["includeLatestBuilds"] = "true" });
 
     /// <summary>
+    /// Returns the details of a specific build, including its pipeline definition name.
+    /// </summary>
+    /// <param name="buildId">The build ID to retrieve.</param>
+    public Task<BuildDetail> GetBuildAsync(int buildId) =>
+        GetAsJsonAsync(
+            $"_apis/build/builds/{buildId}",
+            AzureDevOpsJsonContext.Default.BuildDetail);
+
+    /// <summary>
     /// Returns the timeline for a build, containing stage, job, and task records with their results.
     /// </summary>
     /// <param name="buildId">The build ID to retrieve the timeline for.</param>

@@ -32,6 +32,20 @@ public record BuildDefinitionReference(string Name, ApiBuild? LatestCompletedBui
 public record ApiBuild(int Id, string? Result, string? SourceVersion);
 
 /// <summary>
+/// Details of a single build from the Azure DevOps Builds - Get API.
+/// </summary>
+/// <param name="Id">The unique ID of the build.</param>
+/// <param name="Definition">The pipeline definition that produced this build.</param>
+/// <seealso href="https://learn.microsoft.com/en-us/rest/api/azure/devops/build/builds/get?view=azure-devops-rest-7.1#build" />
+public record BuildDetail(int Id, BuildDefinitionInfo Definition);
+
+/// <summary>
+/// Minimal info about a build's pipeline definition.
+/// </summary>
+/// <param name="Name">The display name of the pipeline.</param>
+public record BuildDefinitionInfo(string Name);
+
+/// <summary>
 /// Response from the Azure DevOps Build Timeline API.
 /// </summary>
 /// <param name="Records">The array of timeline records (stages, jobs, tasks, etc.).</param>
@@ -68,6 +82,7 @@ public record TimelineNode(TimelineRecord Record, IReadOnlyList<TimelineNode> Ch
 /// Source-generated JSON serializer context for the Azure DevOps API response types.
 /// </summary>
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
+[JsonSerializable(typeof(BuildDetail))]
 [JsonSerializable(typeof(DefinitionsResponse))]
 [JsonSerializable(typeof(TimelineResponse))]
 internal partial class AzureDevOpsJsonContext : JsonSerializerContext;

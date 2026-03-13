@@ -30,6 +30,7 @@ bool showAll = parseResult.GetValue(showAllOption);
 string project = parseResult.GetValue(projectOption) ?? "";
 
 using AzureDevOpsClient client = AzureDevOpsClient.Create(project: project);
+BuildDetail build = await client.GetBuildAsync(buildId);
 TimelineResponse timeline = await client.GetBuildTimelineAsync(buildId);
 IReadOnlyList<TimelineNode> roots = timeline.BuildTree();
 
@@ -43,7 +44,7 @@ Func<TimelineNode, bool>? filter = showAll
     ? null
     : node => node.Record.Type is not "Task" || node.Record.Result is "failed";
 
-string timelineLabel = $"Build {buildId} ({client.GetBuildResultUrl(buildId)}):";
+string timelineLabel = $"{build.Definition.Name} - Build {buildId} ({client.GetBuildResultUrl(buildId)}):";
 Spectre.Console.Tree buildTimelineTree = BuildTimelineRendering.RenderTree(roots, timelineLabel, filter);
 Write(buildTimelineTree);
 WriteLine();
