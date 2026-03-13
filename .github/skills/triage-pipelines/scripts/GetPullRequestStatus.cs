@@ -36,38 +36,25 @@ string pr = parseResult.GetValue(pullRequestArgument)!;
 string? repo = parseResult.GetValue(repoOption);
 bool showAll = parseResult.GetValue(showAllOption);
 
-// Resolve the repo from the URL if explicitly provided
-repo ??= ParseRepoFromUrl(pr);
-
-// Get the head SHA and repo from a single gh pr view call.
+// Get check runs for the PR via gh pr checks.
 // When --repo isn't set, gh auto-detects from the current git remote.
-List<string> prViewArgs = ["pr", "view", pr, "--json", "headRefOid,url"];
+List<string> checksArgs = ["pr", "checks", pr, "--json", "name,link"];
 if (repo is not null)
-    prViewArgs.AddRange(["--repo", repo]);
-
-using JsonDocument prInfo = await RunGitHubCliJsonAsync([.. prViewArgs]);
-string headSha = prInfo.RootElement.GetProperty("headRefOid").GetString()?.Trim()
-    ?? throw new InvalidOperationException("Could not get head SHA from PR.");
-repo ??= ParseRepoFromUrl(prInfo.RootElement.GetProperty("url").GetString() ?? "");
-if (repo is null)
 {
-    Write("Error: Could not determine repository from PR data.");
-    return 1;
+    checksArgs.AddRange(["--repo", repo]);
 }
 
-// Get check runs for the head commit via the GitHub REST API.
-// The check-runs endpoint returns details_url which points to Azure DevOps build results.
-List<JsonElement> allCheckRuns = await GetCheckRunsAsync(repo, headSha);
+using JsonDocument checksJson = await RunGhJsonAsync([.. checksArgs]);
 
-// Step 3: Group by build ID, keeping the top-level pipeline entry.
+// Group by build ID, keeping the top-level pipeline entry.
 // Each Azure Pipelines run reports multiple check runs (one per job).
 Dictionary<int, PipelineRun> pipelines = [];
 
-foreach (JsonElement check in allCheckRuns)
+foreach (JsonElement check in checksJson.RootElement.EnumerateArray())
 {
-    string detailsUrl = check.GetProperty("details_url").GetString() ?? "";
+    string link = check.GetProperty("link").GetString() ?? "";
 
-    if (!TryParseAzureDevOpsUrl(detailsUrl, out string? org, out string? project, out int buildId)
+    if (!TryParseAzureDevOpsUrl(link, out string? org, out string? project, out int buildId)
         || org is null || project is null)
     {
         continue;
@@ -127,51 +114,10 @@ foreach (IGrouping<(string Org, string Project), PipelineRun> group in groups)
 return 0;
 
 /// <summary>
-/// Runs a GitHub CLI command and returns the standard output as a string.
+/// Runs a gh CLI command and parses the output as a JSON document.
 /// </summary>
-static Task<string> RunGitHubCliAsync(params string[] arguments) =>
-    ProcessHelper.RunAsync("gh", arguments);
-
-/// <summary>
-/// Runs a GitHub CLI command and parses the output as a JSON document.
-/// </summary>
-static async Task<JsonDocument> RunGitHubCliJsonAsync(params string[] arguments)
-{
-    string response = await RunGitHubCliAsync(arguments);
-    JsonDocument json = JsonDocument.Parse(response);
-    return json;
-}
-
-/// <summary>
-/// Fetches all check runs for a commit, handling paginated JSON output from gh.
-/// </summary>
-static async Task<List<JsonElement>> GetCheckRunsAsync(string repo, string headSha)
-{
-    string checkRunsJson = await RunGitHubCliAsync(
-        "api", $"repos/{repo}/commits/{headSha}/check-runs", "--paginate", "--jq", ".check_runs");
-
-    // gh --paginate with --jq outputs one JSON array per page, newline-separated
-    List<JsonElement> results = [];
-    foreach (string line in checkRunsJson.Split('\n', StringSplitOptions.RemoveEmptyEntries))
-    {
-        using JsonDocument page = JsonDocument.Parse(line);
-        foreach (JsonElement run in page.RootElement.EnumerateArray())
-        {
-            results.Add(run.Clone());
-        }
-    }
-    return results;
-}
-
-/// <summary>
-/// Extracts the "owner/repo" from a GitHub PR URL.
-/// Returns null if the URL doesn't match the expected pattern.
-/// </summary>
-static string? ParseRepoFromUrl(string url)
-{
-    Match match = Regex.Match(url, @"github\.com/([^/]+/[^/]+)/pull/");
-    return match.Success ? match.Groups[1].Value : null;
-}
+static async Task<JsonDocument> RunGhJsonAsync(params IEnumerable<string> arguments) =>
+    JsonDocument.Parse(await ProcessHelper.RunAsync("gh", arguments.ToArray()));
 
 /// <summary>
 /// Parses an Azure DevOps build URL to extract the org, project, and build ID.
@@ -183,7 +129,6 @@ static bool TryParseAzureDevOpsUrl(string url, out string? org, out string? proj
     project = null;
     buildId = 0;
 
-    // Match: https://dev.azure.com/{org}/{project}/_build/results?...buildId={id}...
     Match match = Regex.Match(url, @"^https://dev\.azure\.com/([^/]+)/([^/]+)/_build/results");
     if (!match.Success)
     {
@@ -193,7 +138,6 @@ static bool TryParseAzureDevOpsUrl(string url, out string? org, out string? proj
     org = match.Groups[1].Value;
     project = match.Groups[2].Value;
 
-    // Extract buildId from query string
     int queryStart = url.IndexOf('?');
     if (queryStart < 0)
     {
