@@ -36,15 +36,24 @@ string pr = parseResult.GetValue(pullRequestArgument)!;
 string? repo = parseResult.GetValue(repoOption);
 bool showAll = parseResult.GetValue(showAllOption);
 
-// Get check runs for the PR via `gh pr checks`.
 // When --repo isn't set, gh auto-detects from the current git remote.
-List<string> checksArgs = ["pr", "checks", pr, "--json", "name,link"];
-if (repo is not null)
-{
-    checksArgs.AddRange(["--repo", repo]);
-}
+List<string> repoArgs = repo is not null ? ["--repo", repo] : [];
 
-using JsonDocument checksJson = await RunGhJsonAsync([.. checksArgs]);
+// Fetch PR metadata and check runs in parallel
+List<string> prViewArgs = ["pr", "view", pr, "--json", "title,headRefName", .. repoArgs];
+List<string> checksArgs = ["pr", "checks", pr, "--json", "name,link", .. repoArgs];
+
+Task<JsonDocument> prInfoTask = RunGhJsonAsync([.. prViewArgs]);
+Task<JsonDocument> checksTask = RunGhJsonAsync([.. checksArgs]);
+
+using JsonDocument prInfo = await prInfoTask;
+using JsonDocument checksJson = await checksTask;
+
+string prTitle = prInfo.RootElement.GetProperty("title").GetString() ?? "";
+string prBranch = prInfo.RootElement.GetProperty("headRefName").GetString() ?? "";
+WriteLine($"PR: {prTitle}");
+WriteLine($"Branch: {prBranch}");
+WriteLine();
 
 // Group by build ID, keeping the top-level pipeline entry.
 // Each Azure Pipelines run reports multiple check runs (one per job).
