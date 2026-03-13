@@ -57,6 +57,7 @@ public static class ImageBuilder
             builder.Services.AddSingleton<ILifecycleMetadataService, LifecycleMetadataService>();
             builder.Services.AddMemoryCache();
             builder.Services.AddSingleton<IManifestJsonService, ManifestJsonService>();
+            builder.Services.AddSingleton<IManifestListService, ManifestListService>();
             builder.Services.AddSingleton<IManifestServiceFactory, ManifestServiceFactory>();
             builder.Services.AddSingleton<IMarImageIngestionReporter, MarImageIngestionReporter>();
             builder.Services.AddSingleton<IMcrStatusClientFactory, McrStatusClientFactory>();
@@ -80,6 +81,7 @@ public static class ImageBuilder
             builder.Services.AddSingleton<ICommand, CleanAcrImagesCommand>();
             builder.Services.AddSingleton<ICommand, CopyAcrImagesCommand>();
             builder.Services.AddSingleton<ICommand, CopyBaseImagesCommand>();
+            builder.Services.AddSingleton<ICommand, CreateManifestListCommand>();
             builder.Services.AddSingleton<ICommand, GenerateBuildMatrixCommand>();
             builder.Services.AddSingleton<ICommand, GenerateDockerfilesCommand>();
             builder.Services.AddSingleton<ICommand, GenerateEolAnnotationDataForAllImagesCommand>();

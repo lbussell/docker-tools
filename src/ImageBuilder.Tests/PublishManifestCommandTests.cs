@@ -26,37 +26,16 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
     public class PublishManifestCommandTests
     {
         /// <summary>
-        /// Verifies the image info output for shared tags.
+        /// Verifies manifest lists are created and pushed for images with shared tags.
+        /// Digest saving has moved to CreateManifestListCommand, so this command
+        /// should NOT modify image-info.json.
         /// </summary>
         [Fact]
-        public async Task ImageInfoTagOutput()
+        public async Task CreatesAndPushesManifestLists()
         {
-            Mock<IManifestService> manifestServiceMock = new()
-            {
-                CallBase = true
-            };
+            Mock<IDockerService> dockerServiceMock = new();
 
-            manifestServiceMock
-                .Setup(o => o.GetManifestAsync("repo1:sharedtag2", false))
-                .ReturnsAsync(new ManifestQueryResult("digest1", new JsonObject()));
-            manifestServiceMock
-                .Setup(o => o.GetManifestAsync("repo2:sharedtag3", false))
-                .ReturnsAsync(new ManifestQueryResult("digest2", new JsonObject()));
-
-            Mock<IManifestServiceFactory> manifestServiceFactoryMock =
-                CreateManifestServiceFactoryMock(manifestServiceMock);
-
-            DateTime manifestCreatedDate = DateTime.UtcNow;
-            IDateTimeService dateTimeService = Mock.Of<IDateTimeService>(o => o.UtcNow == manifestCreatedDate);
-
-            PublishManifestCommand command = new(
-                TestHelper.CreateManifestJsonService(),
-                manifestServiceFactoryMock.Object,
-                Mock.Of<IDockerService>(),
-                Mock.Of<ILogger<PublishManifestCommand>>(),
-                dateTimeService,
-                Mock.Of<IRegistryCredentialsProvider>(),
-                Mock.Of<IAzureTokenCredentialProvider>());
+            PublishManifestCommand command = CreateCommand(dockerServiceMock);
 
             using TempFolderContext tempFolderContext = new TempFolderContext();
 
@@ -65,11 +44,6 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
 
             string dockerfile1 = CreateDockerfile("1.0/repo1/os", tempFolderContext);
             string dockerfile2 = CreateDockerfile("1.0/repo2/os", tempFolderContext);
-            string dockerfile3 = CreateDockerfile("1.0/repo3/os", tempFolderContext);
-
-            const string digest1 = "sha256:123";
-            const string digest2 = "sha256:ABC";
-            const string digest3 = "sha256:DEF";
 
             ImageArtifactDetails imageArtifactDetails = new ImageArtifactDetails
             {
@@ -84,10 +58,7 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
                             {
                                 Platforms =
                                 {
-                                    CreatePlatform(dockerfile1, digest: digest1, simpleTags: new List<string>{ "tag1" }),
-                                    new PlatformData
-                                    {
-                                    }
+                                    CreatePlatform(dockerfile1, simpleTags: new List<string>{ "tag1" }),
                                 },
                                 Manifest = new ManifestData
                                 {
@@ -100,42 +71,6 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
                             }
                         }
                     },
-                    new RepoData
-                    {
-                        Repo = "repo2",
-                        Images =
-                        {
-                            new ImageData
-                            {
-                                Platforms =
-                                {
-                                    CreatePlatform(dockerfile2, digest: digest2, simpleTags: new List<string>{ "tag2" })
-                                },
-                                Manifest = new ManifestData
-                                {
-                                    SharedTags =
-                                    {
-                                        "sharedtag1",
-                                        "sharedtag3"
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    new RepoData
-                    {
-                        Repo = "repo3",
-                        Images =
-                        {
-                            new ImageData
-                            {
-                                Platforms =
-                                {
-                                    CreatePlatform(dockerfile3, digest: digest3, simpleTags: new List<string>{ "tag3" })
-                                }
-                            }
-                        }
-                    }
                 }
             };
             File.WriteAllText(command.Options.ImageInfoPath, JsonHelper.SerializeObject(imageArtifactDetails));
@@ -151,143 +86,17 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
                         {
                             { "sharedtag2", new Tag() },
                             { "sharedtag1", new Tag() }
-                        })),
-                CreateRepo("repo2",
-                    CreateImage(
-                        new Platform[]
-                        {
-                            CreatePlatform(dockerfile2, new string[] { "tag2" })
-                        },
-                        new Dictionary<string, Tag>
-                        {
-                            { "sharedtag3", new Tag() },
-                            { "sharedtag1", new Tag() }
-                        })),
-                CreateRepo("repo3",
-                    CreateImage(
-                        new Platform[]
-                        {
-                            CreatePlatform(dockerfile3, new string[] { "tag3" })
-                        })),
-                CreateRepo("unpublishedrepo",
-                    CreateImage(
-                        new Platform[]
-                        {
-                            CreatePlatform(
-                                CreateDockerfile("1.0/unpublishedrepo/os", tempFolderContext),
-                                new string[] { "tag" })
-                        },
-                        new Dictionary<string, Tag>
-                        {
-                            { "sharedtag", new Tag() }
-                        }))
-            );
+                        })));
             File.WriteAllText(command.Options.Manifest, JsonHelper.SerializeObject(manifest));
 
             command.LoadManifest();
             await command.ExecuteAsync();
 
-            string actualOutput = File.ReadAllText(command.Options.ImageInfoPath);
+            dockerServiceMock.Verify(o => o.CreateManifestList("repo1:sharedtag1", new string[] { "repo1:tag1" }, false));
+            dockerServiceMock.Verify(o => o.CreateManifestList("repo1:sharedtag2", new string[] { "repo1:tag1" }, false));
 
-            ImageArtifactDetails actualImageArtifactDetails = JsonConvert.DeserializeObject<ImageArtifactDetails>(actualOutput);
-
-            ImageArtifactDetails expectedImageArtifactDetails = new()
-            {
-                Repos =
-                {
-                    new RepoData
-                    {
-                        Repo = "repo1",
-                        Images =
-                        {
-                            new ImageData
-                            {
-                                Platforms =
-                                {
-                                    new PlatformData
-                                    {
-                                        Dockerfile = "1.0/repo1/os/Dockerfile",
-                                        OsType = "Linux",
-                                        OsVersion = "noble",
-                                        Architecture = "amd64",
-                                        Digest = digest1,
-                                        SimpleTags = new List<string> { "tag1" }
-                                    },
-                                    new PlatformData()
-                                },
-                                Manifest = new ManifestData
-                                {
-                                    Created = manifestCreatedDate,
-                                    Digest = "repo1@digest1",
-                                    SharedTags =
-                                    {
-                                        "sharedtag1",
-                                        "sharedtag2"
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    new RepoData
-                    {
-                        Repo = "repo2",
-                        Images =
-                        {
-                            new ImageData
-                            {
-                                Platforms =
-                                {
-                                    new PlatformData
-                                    {
-                                        Dockerfile = "1.0/repo2/os/Dockerfile",
-                                        OsType = "Linux",
-                                        OsVersion = "noble",
-                                        Architecture = "amd64",
-                                        Digest = digest2,
-                                        SimpleTags = new List<string> { "tag2" }
-                                    }
-                                },
-                                Manifest = new ManifestData
-                                {
-                                    Created = manifestCreatedDate,
-                                    Digest = "repo2@digest2",
-                                    SharedTags =
-                                    {
-                                        "sharedtag1",
-                                        "sharedtag3"
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    new RepoData
-                    {
-                        Repo = "repo3",
-                        Images =
-                        {
-                            new ImageData
-                            {
-                                Platforms =
-                                {
-                                    new PlatformData
-                                    {
-                                        Dockerfile = "1.0/repo3/os/Dockerfile",
-                                        OsType = "Linux",
-                                        OsVersion = "noble",
-                                        Architecture = "amd64",
-                                        Digest = digest3,
-                                        SimpleTags = new List<string> { "tag3" }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            };
-
-            string expectedOutput = JsonHelper.SerializeObject(expectedImageArtifactDetails);
-
-            Assert.Equal(expectedOutput, actualOutput);
+            dockerServiceMock.Verify(o => o.PushManifestList("repo1:sharedtag1", false));
+            dockerServiceMock.Verify(o => o.PushManifestList("repo1:sharedtag2", false));
         }
 
         /// <summary>
@@ -297,26 +106,9 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
         [Fact]
         public async Task DuplicatePlatform()
         {
-            Mock<IManifestService> manifestService = CreateManifestServiceMock();
-            Mock<IManifestServiceFactory> manifestServiceFactory = CreateManifestServiceFactoryMock(manifestService);
-            manifestService
-                .Setup(o => o.GetManifestAsync(It.IsAny<ImageName>(), false))
-                .ReturnsAsync(new ManifestQueryResult("digest", new JsonObject()));
-
-            manifestService
-                .Setup(o => o.GetManifestDigestShaAsync(It.IsAny<string>(), It.IsAny<bool>()))
-                .ReturnsAsync(Guid.NewGuid().ToString());
-
             Mock<IDockerService> dockerServiceMock = new();
 
-            PublishManifestCommand command = new PublishManifestCommand(
-                TestHelper.CreateManifestJsonService(),
-                manifestServiceFactory.Object,
-                dockerServiceMock.Object,
-                Mock.Of<ILogger<PublishManifestCommand>>(),
-                Mock.Of<IDateTimeService>(),
-                Mock.Of<IRegistryCredentialsProvider>(),
-                Mock.Of<IAzureTokenCredentialProvider>());
+            PublishManifestCommand command = CreateCommand(dockerServiceMock);
 
             using TempFolderContext tempFolderContext = new TempFolderContext();
 
@@ -424,29 +216,9 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
         [Fact]
         public async Task SyndicatedTag()
         {
-            Mock<IManifestService> manifestServiceMock = new()
-            {
-                CallBase = true
-            };
-
-            Mock<IManifestServiceFactory> manifestServiceFactory = CreateManifestServiceFactoryMock(manifestServiceMock);
-            manifestServiceMock
-                .Setup(o => o.GetManifestAsync(It.IsAny<ImageName>(), false))
-                .ReturnsAsync(new ManifestQueryResult("digest", new JsonObject()));
-
             Mock<IDockerService> dockerServiceMock = new();
 
-            DateTime manifestCreatedDate = DateTime.UtcNow;
-            IDateTimeService dateTimeService = Mock.Of<IDateTimeService>(o => o.UtcNow == manifestCreatedDate);
-
-            PublishManifestCommand command = new PublishManifestCommand(
-                TestHelper.CreateManifestJsonService(),
-                manifestServiceFactory.Object,
-                dockerServiceMock.Object,
-                Mock.Of<ILogger<PublishManifestCommand>>(),
-                dateTimeService,
-                Mock.Of<IRegistryCredentialsProvider>(),
-                Mock.Of<IAzureTokenCredentialProvider>());
+            PublishManifestCommand command = CreateCommand(dockerServiceMock);
 
             using TempFolderContext tempFolderContext = new TempFolderContext();
 
@@ -474,6 +246,11 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
                                         {
                                             "tag1",
                                             "tag2"
+                                        }),
+                                    CreatePlatform(dockerfile2,
+                                        simpleTags: new List<string>
+                                        {
+                                            "tag3"
                                         })
                                 },
                                 Manifest = new ManifestData
@@ -562,51 +339,6 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
             dockerServiceMock.Verify(o => o.PushManifestList("mcr.microsoft.com/repo:sharedtag2", false));
             dockerServiceMock.Verify(o => o.PushManifestList("mcr.microsoft.com/repo2:sharedtag2a", false));
             dockerServiceMock.Verify(o => o.PushManifestList("mcr.microsoft.com/repo2:sharedtag2b", false));
-
-            ImageArtifactDetails expectedImageArtifactDetails = new ImageArtifactDetails
-            {
-                Repos =
-                {
-                    new RepoData
-                    {
-                        Repo = "repo",
-                        Images =
-                        {
-                            new ImageData
-                            {
-                                Platforms =
-                                {
-                                    CreatePlatform(dockerfile1,
-                                        simpleTags: new List<string>
-                                        {
-                                            "tag1",
-                                            "tag2"
-                                        })
-                                },
-                                Manifest = new ManifestData
-                                {
-                                    Digest = "mcr.microsoft.com/repo@digest",
-                                    Created = manifestCreatedDate,
-                                    SyndicatedDigests = new List<string>
-                                    {
-                                        "mcr.microsoft.com/repo2@digest"
-                                    },
-                                    SharedTags =
-                                    {
-                                        "sharedtag1",
-                                        "sharedtag2"
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            };
-
-            string expectedOutput = JsonHelper.SerializeObject(expectedImageArtifactDetails);
-            string actualOutput = File.ReadAllText(command.Options.ImageInfoPath);
-
-            Assert.Equal(expectedOutput, actualOutput);
         }
 
         /// <summary>
@@ -615,30 +347,9 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
         [Fact]
         public async Task UnchangedManifestList()
         {
-            Mock<IManifestService> manifestServiceMock = new()
-            {
-                CallBase = true
-            };
-
-            Mock<IManifestService> manifestService = CreateManifestServiceMock();
-            Mock<IManifestServiceFactory> manifestServiceFactory = CreateManifestServiceFactoryMock(manifestService);
-            manifestService
-                .Setup(o => o.GetManifestDigestShaAsync(It.IsAny<string>(), It.IsAny<bool>()))
-                .ReturnsAsync(Guid.NewGuid().ToString());
-
             Mock<IDockerService> dockerServiceMock = new();
 
-            DateTime manifestCreatedDate = DateTime.UtcNow;
-            IDateTimeService dateTimeService = Mock.Of<IDateTimeService>(o => o.UtcNow == manifestCreatedDate);
-
-            PublishManifestCommand command = new(
-                TestHelper.CreateManifestJsonService(),
-                manifestServiceFactory.Object,
-                dockerServiceMock.Object,
-                Mock.Of<ILogger<PublishManifestCommand>>(),
-                dateTimeService,
-                Mock.Of<IRegistryCredentialsProvider>(),
-                Mock.Of<IAzureTokenCredentialProvider>());
+            PublishManifestCommand command = CreateCommand(dockerServiceMock);
 
             using TempFolderContext tempFolderContext = new();
             command.Options.Manifest = Path.Combine(tempFolderContext.Path, "manifest.json");
@@ -695,5 +406,12 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
                 Times.Never);
         }
 
+        private static PublishManifestCommand CreateCommand(Mock<IDockerService> dockerServiceMock) =>
+            new(
+                TestHelper.CreateManifestJsonService(),
+                dockerServiceMock.Object,
+                Mock.Of<ILogger<PublishManifestCommand>>(),
+                Mock.Of<IRegistryCredentialsProvider>(),
+                new ManifestListService(dockerServiceMock.Object));
     }
 }
