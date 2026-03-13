@@ -3,10 +3,10 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
-#:project common/TriagePipelines.csproj
+#:project ../../../../src/Skills/Skills.csproj
 
 using System.CommandLine;
-using TriagePipelines;
+using Microsoft.DotNet.DockerTools.Skills;
 using static System.Console;
 
 Argument<string> folderArgument = new("folder")
@@ -26,8 +26,8 @@ RootCommand rootCommand = new("Lists failing pipelines in an Azure DevOps pipeli
 };
 
 ParseResult parseResult = rootCommand.Parse(args);
-string folder = parseResult.GetValue(folderArgument);
-string project = parseResult.GetValue(projectOption);
+string folder = parseResult.GetValue(folderArgument) ?? "";
+string project = parseResult.GetValue(projectOption) ?? "internal";
 
 // Normalize to the backslash-prefixed format the API expects (e.g., \dotnet\docker-tools)
 folder = @"\" + folder.Trim('\\', '/').Replace('/', '\\');

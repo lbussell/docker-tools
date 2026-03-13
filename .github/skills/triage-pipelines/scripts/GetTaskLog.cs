@@ -3,10 +3,10 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
-#:project common/TriagePipelines.csproj
+#:project ../../../../src/Skills/Skills.csproj
 
 using System.CommandLine;
-using TriagePipelines;
+using Microsoft.DotNet.DockerTools.Skills;
 
 Argument<int> buildIdArgument = new("buildId") { Description = "The build ID to fetch the log from." };
 Argument<int> logIdArgument = new("logId") { Description = "The log ID to fetch." };
@@ -26,7 +26,7 @@ RootCommand rootCommand = new("Fetches a task log from an Azure DevOps build.")
 ParseResult parseResult = rootCommand.Parse(args);
 int buildId = parseResult.GetValue(buildIdArgument);
 int logId = parseResult.GetValue(logIdArgument);
-string project = parseResult.GetValue(projectOption);
+string project = parseResult.GetValue(projectOption) ?? "internal";
 
 using AzureDevOpsClient client = AzureDevOpsClient.Create(project: project);
 string logContent = await client.GetBuildLogContentAsync(buildId, logId);
