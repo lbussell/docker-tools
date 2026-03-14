@@ -67,17 +67,23 @@ public class CreateManifestListCommand : ManifestCommand<CreateManifestListOptio
             Options.IsDryRun,
             async () =>
             {
-                IReadOnlyList<string> manifestTags = _manifestListService.CreateManifestLists(
-                    Manifest, imageArtifactDetails, Options.RepoPrefix, Options.IsDryRun);
+                IReadOnlyList<ManifestListInfo> manifestLists =
+                    _manifestListService.GetManifestListsForChangedImages(
+                        Manifest, imageArtifactDetails, Options.RepoPrefix);
+
+                foreach (ManifestListInfo manifestListInfo in manifestLists)
+                {
+                    _dockerService.CreateManifestList(manifestListInfo.Tag, manifestListInfo.PlatformTags, Options.IsDryRun);
+                }
 
                 DateTime createdDate = _dateTimeService.UtcNow;
 
-                Parallel.ForEach(manifestTags, tag =>
+                Parallel.ForEach(manifestLists, manifestListInfo =>
                 {
-                    _dockerService.PushManifestList(tag, Options.IsDryRun);
+                    _dockerService.PushManifestList(manifestListInfo.Tag, Options.IsDryRun);
                 });
 
-                WriteManifestSummary(manifestTags);
+                WriteManifestSummary(manifestLists);
 
                 await SaveTagInfoToImageInfoFileAsync(createdDate, imageArtifactDetails);
             },
@@ -127,21 +133,13 @@ public class CreateManifestListCommand : ManifestCommand<CreateManifestListOptio
         File.WriteAllText(Options.ImageInfoPath, imageInfoString);
     }
 
-    private void WriteManifestSummary(IReadOnlyList<string> manifestTags)
+    private void WriteManifestSummary(IReadOnlyList<ManifestListInfo> manifestLists)
     {
-        _logger.LogInformation("MANIFEST LISTS CREATED");
+        foreach (ManifestListInfo manifestListInfo in manifestLists)
+            _logger.LogInformation(manifestListInfo.Tag);
 
-        if (manifestTags.Count > 0)
-        {
-            foreach (string tag in manifestTags)
-            {
-                _logger.LogInformation(tag);
-            }
-        }
-        else
-        {
+        if (manifestLists.Count == 0)
             _logger.LogInformation("No manifest lists created");
-        }
 
         _logger.LogInformation(string.Empty);
     }

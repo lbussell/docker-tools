@@ -11,7 +11,6 @@ using Microsoft.DotNet.ImageBuilder.Models.Image;
 using Microsoft.DotNet.ImageBuilder.Models.Manifest;
 using Microsoft.DotNet.ImageBuilder.Tests.Helpers;
 using Microsoft.DotNet.ImageBuilder.ViewModel;
-using Moq;
 using Shouldly;
 using Xunit;
 using static Microsoft.DotNet.ImageBuilder.Tests.Helpers.DockerfileHelper;
@@ -23,10 +22,10 @@ namespace Microsoft.DotNet.ImageBuilder.Tests;
 public class ManifestListServiceTests
 {
     /// <summary>
-    /// Verifies that a manifest list is created containing all built platforms.
+    /// Verifies that a manifest list is returned containing all built platforms.
     /// </summary>
     [Fact]
-    public void CreateManifestLists_BasicMultiPlatform()
+    public void GetManifestListsForChangedImages_BasicMultiPlatform()
     {
         using TempFolderContext tempFolderContext = TestHelper.UseTempFolder();
 
@@ -47,22 +46,17 @@ public class ManifestListServiceTests
                     CreatePlatform(dockerfile1, simpleTags: ["tag-amd64"]),
                     CreatePlatform(dockerfile2, simpleTags: ["tag-arm64"], architecture: "arm64"))));
 
-        Mock<IDockerService> dockerServiceMock = new();
-        ManifestListService service = CreateService(dockerServiceMock);
+        ManifestListService service = new();
         ManifestInfo manifestInfo = LoadManifest(manifest, tempFolderContext);
         ImageArtifactDetails linkedImageInfo = LoadImageInfo(imageArtifactDetails, manifestInfo, tempFolderContext);
 
-        IReadOnlyList<string> createdTags = service.CreateManifestLists(
-            manifestInfo, linkedImageInfo, repoPrefix: null, isDryRun: false);
+        IReadOnlyList<ManifestListInfo> results = service.GetManifestListsForChangedImages(
+            manifestInfo, linkedImageInfo, repoPrefix: null);
 
-        createdTags.Count.ShouldBe(1);
-        createdTags.ShouldContain("repo:sharedtag");
-
-        dockerServiceMock.Verify(o => o.CreateManifestList(
-            "repo:sharedtag",
-            It.Is<IEnumerable<string>>(images =>
-                images.Contains("repo:tag-amd64") && images.Contains("repo:tag-arm64")),
-            false));
+        results.Count.ShouldBe(1);
+        results[0].Tag.ShouldBe("repo:sharedtag");
+        results[0].PlatformTags.ShouldContain("repo:tag-amd64");
+        results[0].PlatformTags.ShouldContain("repo:tag-arm64");
     }
 
     /// <summary>
@@ -70,7 +64,7 @@ public class ManifestListServiceTests
     /// Platforms defined in the manifest but not built should be excluded.
     /// </summary>
     [Fact]
-    public void CreateManifestLists_OnlyIncludesBuiltPlatforms()
+    public void GetManifestListsForChangedImages_OnlyIncludesBuiltPlatforms()
     {
         using TempFolderContext tempFolderContext = TestHelper.UseTempFolder();
 
@@ -95,32 +89,26 @@ public class ManifestListServiceTests
                     CreatePlatform(dockerfileAmd64, simpleTags: ["tag-amd64"]),
                     CreatePlatform(dockerfileArm64, simpleTags: ["tag-arm64"], architecture: "arm64"))));
 
-        Mock<IDockerService> dockerServiceMock = new();
-        ManifestListService service = CreateService(dockerServiceMock);
+        ManifestListService service = new();
         ManifestInfo manifestInfo = LoadManifest(manifest, tempFolderContext);
         ImageArtifactDetails linkedImageInfo = LoadImageInfo(imageArtifactDetails, manifestInfo, tempFolderContext);
 
-        IReadOnlyList<string> createdTags = service.CreateManifestLists(
-            manifestInfo, linkedImageInfo, repoPrefix: null, isDryRun: false);
+        IReadOnlyList<ManifestListInfo> results = service.GetManifestListsForChangedImages(
+            manifestInfo, linkedImageInfo, repoPrefix: null);
 
-        createdTags.Count.ShouldBe(1);
-
-        // Manifest list should only contain the 2 built platforms, not Windows
-        dockerServiceMock.Verify(o => o.CreateManifestList(
-            "repo:sharedtag",
-            It.Is<IEnumerable<string>>(images =>
-                images.Count() == 2 &&
-                images.Contains("repo:tag-amd64") &&
-                images.Contains("repo:tag-arm64")),
-            false));
+        results.Count.ShouldBe(1);
+        results[0].PlatformTags.Count.ShouldBe(2);
+        results[0].PlatformTags.ShouldContain("repo:tag-amd64");
+        results[0].PlatformTags.ShouldContain("repo:tag-arm64");
+        results[0].PlatformTags.ShouldNotContain("repo:tag-windows");
     }
 
     /// <summary>
-    /// Verifies that no manifest list is created when an image has shared tags
+    /// Verifies that no manifest list is returned when an image has shared tags
     /// but no platforms exist in image-info.
     /// </summary>
     [Fact]
-    public void CreateManifestLists_SkipsImageWithNoBuiltPlatforms()
+    public void GetManifestListsForChangedImages_SkipsImageWithNoBuiltPlatforms()
     {
         using TempFolderContext tempFolderContext = TestHelper.UseTempFolder();
 
@@ -144,28 +132,23 @@ public class ManifestListServiceTests
                     ["built-sharedtag"],
                     CreatePlatform(dockerfile2, simpleTags: ["tag2"]))));
 
-        Mock<IDockerService> dockerServiceMock = new();
-        ManifestListService service = CreateService(dockerServiceMock);
+        ManifestListService service = new();
         ManifestInfo manifestInfo = LoadManifest(manifest, tempFolderContext);
         ImageArtifactDetails linkedImageInfo = LoadImageInfo(imageArtifactDetails, manifestInfo, tempFolderContext);
 
-        IReadOnlyList<string> createdTags = service.CreateManifestLists(
-            manifestInfo, linkedImageInfo, repoPrefix: null, isDryRun: false);
+        IReadOnlyList<ManifestListInfo> results = service.GetManifestListsForChangedImages(
+            manifestInfo, linkedImageInfo, repoPrefix: null);
 
-        // Only the second image's manifest list should be created
-        createdTags.Count.ShouldBe(1);
-        createdTags.ShouldContain("repo:built-sharedtag");
-
-        dockerServiceMock.Verify(o => o.CreateManifestList(
-            "repo:sharedtag", It.IsAny<IEnumerable<string>>(), It.IsAny<bool>()),
-            Times.Never);
+        // Only the second image's manifest list should be returned
+        results.Count.ShouldBe(1);
+        results[0].Tag.ShouldBe("repo:built-sharedtag");
     }
 
     /// <summary>
-    /// Verifies that manifest lists are not created for images where all platforms are unchanged.
+    /// Verifies that no manifest lists are returned for images where all platforms are unchanged.
     /// </summary>
     [Fact]
-    public void CreateManifestLists_SkipsUnchangedImages()
+    public void GetManifestListsForChangedImages_SkipsUnchangedImages()
     {
         using TempFolderContext tempFolderContext = TestHelper.UseTempFolder();
 
@@ -183,27 +166,22 @@ public class ManifestListServiceTests
                     ["sharedtag"],
                     CreatePlatform(dockerfile, simpleTags: ["tag1"], isUnchanged: true))));
 
-        Mock<IDockerService> dockerServiceMock = new();
-        ManifestListService service = CreateService(dockerServiceMock);
+        ManifestListService service = new();
         ManifestInfo manifestInfo = LoadManifest(manifest, tempFolderContext);
         ImageArtifactDetails linkedImageInfo = LoadImageInfo(imageArtifactDetails, manifestInfo, tempFolderContext);
 
-        IReadOnlyList<string> createdTags = service.CreateManifestLists(
-            manifestInfo, linkedImageInfo, repoPrefix: null, isDryRun: false);
+        IReadOnlyList<ManifestListInfo> results = service.GetManifestListsForChangedImages(
+            manifestInfo, linkedImageInfo, repoPrefix: null);
 
-        createdTags.ShouldBeEmpty();
-
-        dockerServiceMock.Verify(o => o.CreateManifestList(
-            It.IsAny<string>(), It.IsAny<IEnumerable<string>>(), It.IsAny<bool>()),
-            Times.Never);
+        results.ShouldBeEmpty();
     }
 
     /// <summary>
-    /// Verifies that manifest lists are created when at least one platform has changed,
+    /// Verifies that manifest lists are returned when at least one platform has changed,
     /// including both changed and unchanged platforms.
     /// </summary>
     [Fact]
-    public void CreateManifestLists_IncludesPartiallyChangedImages()
+    public void GetManifestListsForChangedImages_IncludesPartiallyChangedImages()
     {
         using TempFolderContext tempFolderContext = TestHelper.UseTempFolder();
 
@@ -225,31 +203,24 @@ public class ManifestListServiceTests
                     CreatePlatform(dockerfileUnchanged, simpleTags: ["unchanged-tag"],
                         architecture: "arm64", isUnchanged: true))));
 
-        Mock<IDockerService> dockerServiceMock = new();
-        ManifestListService service = CreateService(dockerServiceMock);
+        ManifestListService service = new();
         ManifestInfo manifestInfo = LoadManifest(manifest, tempFolderContext);
         ImageArtifactDetails linkedImageInfo = LoadImageInfo(imageArtifactDetails, manifestInfo, tempFolderContext);
 
-        IReadOnlyList<string> createdTags = service.CreateManifestLists(
-            manifestInfo, linkedImageInfo, repoPrefix: null, isDryRun: false);
+        IReadOnlyList<ManifestListInfo> results = service.GetManifestListsForChangedImages(
+            manifestInfo, linkedImageInfo, repoPrefix: null);
 
-        createdTags.Count.ShouldBe(1);
-
-        // Both platforms should be in the manifest list
-        dockerServiceMock.Verify(o => o.CreateManifestList(
-            "repo:sharedtag",
-            It.Is<IEnumerable<string>>(images =>
-                images.Count() == 2 &&
-                images.Contains("repo:changed-tag") &&
-                images.Contains("repo:unchanged-tag")),
-            false));
+        results.Count.ShouldBe(1);
+        results[0].PlatformTags.Count.ShouldBe(2);
+        results[0].PlatformTags.ShouldContain("repo:changed-tag");
+        results[0].PlatformTags.ShouldContain("repo:unchanged-tag");
     }
 
     /// <summary>
     /// Verifies that images without shared tags do not produce manifest lists.
     /// </summary>
     [Fact]
-    public void CreateManifestLists_SkipsImagesWithNoSharedTags()
+    public void GetManifestListsForChangedImages_SkipsImagesWithNoSharedTags()
     {
         using TempFolderContext tempFolderContext = TestHelper.UseTempFolder();
 
@@ -265,19 +236,14 @@ public class ManifestListServiceTests
                 CreateImageData(
                     CreatePlatform(dockerfile, simpleTags: ["tag1"]))));
 
-        Mock<IDockerService> dockerServiceMock = new();
-        ManifestListService service = CreateService(dockerServiceMock);
+        ManifestListService service = new();
         ManifestInfo manifestInfo = LoadManifest(manifest, tempFolderContext);
         ImageArtifactDetails linkedImageInfo = LoadImageInfo(imageArtifactDetails, manifestInfo, tempFolderContext);
 
-        IReadOnlyList<string> createdTags = service.CreateManifestLists(
-            manifestInfo, linkedImageInfo, repoPrefix: null, isDryRun: false);
+        IReadOnlyList<ManifestListInfo> results = service.GetManifestListsForChangedImages(
+            manifestInfo, linkedImageInfo, repoPrefix: null);
 
-        createdTags.ShouldBeEmpty();
-
-        dockerServiceMock.Verify(o => o.CreateManifestList(
-            It.IsAny<string>(), It.IsAny<IEnumerable<string>>(), It.IsAny<bool>()),
-            Times.Never);
+        results.ShouldBeEmpty();
     }
 
     /// <summary>
@@ -285,7 +251,7 @@ public class ManifestListServiceTests
     /// from a matching platform in another image within the same repo.
     /// </summary>
     [Fact]
-    public void CreateManifestLists_DuplicatePlatformCrossReference()
+    public void GetManifestListsForChangedImages_DuplicatePlatformCrossReference()
     {
         using TempFolderContext tempFolderContext = TestHelper.UseTempFolder();
 
@@ -312,28 +278,25 @@ public class ManifestListServiceTests
                     ["sharedtag2"],
                     CreatePlatform(dockerfile))));
 
-        Mock<IDockerService> dockerServiceMock = new();
-        ManifestListService service = CreateService(dockerServiceMock);
+        ManifestListService service = new();
         ManifestInfo manifestInfo = LoadManifest(manifest, tempFolderContext);
         ImageArtifactDetails linkedImageInfo = LoadImageInfo(imageArtifactDetails, manifestInfo, tempFolderContext);
 
-        IReadOnlyList<string> createdTags = service.CreateManifestLists(
-            manifestInfo, linkedImageInfo, repoPrefix: null, isDryRun: false);
+        IReadOnlyList<ManifestListInfo> results = service.GetManifestListsForChangedImages(
+            manifestInfo, linkedImageInfo, repoPrefix: null);
 
-        createdTags.Count.ShouldBe(2);
+        results.Count.ShouldBe(2);
 
         // sharedtag2's platform has no tags, so it should use tag1 from the matching platform in Image 1
-        dockerServiceMock.Verify(o => o.CreateManifestList(
-            "mcr.microsoft.com/repo:sharedtag2",
-            new[] { "mcr.microsoft.com/repo:tag1" },
-            false));
+        ManifestListInfo crossRefManifest = results.Single(r => r.Tag == "mcr.microsoft.com/repo:sharedtag2");
+        crossRefManifest.PlatformTags.ShouldBe(["mcr.microsoft.com/repo:tag1"]);
     }
 
     /// <summary>
-    /// Verifies that manifest lists are created for syndicated repos with correct tags.
+    /// Verifies that manifest lists are returned for syndicated repos with correct tags.
     /// </summary>
     [Fact]
-    public void CreateManifestLists_SyndicatedTags()
+    public void GetManifestListsForChangedImages_SyndicatedTags()
     {
         using TempFolderContext tempFolderContext = TestHelper.UseTempFolder();
 
@@ -381,33 +344,26 @@ public class ManifestListServiceTests
                     ["sharedtag"],
                     CreatePlatform(dockerfile, simpleTags: ["tag1"]))));
 
-        Mock<IDockerService> dockerServiceMock = new();
-        ManifestListService service = CreateService(dockerServiceMock);
+        ManifestListService service = new();
         ManifestInfo manifestInfo = LoadManifest(manifest, tempFolderContext);
         ImageArtifactDetails linkedImageInfo = LoadImageInfo(imageArtifactDetails, manifestInfo, tempFolderContext);
 
-        IReadOnlyList<string> createdTags = service.CreateManifestLists(
-            manifestInfo, linkedImageInfo, repoPrefix: null, isDryRun: false);
+        IReadOnlyList<ManifestListInfo> results = service.GetManifestListsForChangedImages(
+            manifestInfo, linkedImageInfo, repoPrefix: null);
 
-        // Should create manifest for primary repo AND syndicated repo
-        createdTags.ShouldContain("mcr.microsoft.com/repo:sharedtag");
-        createdTags.ShouldContain("mcr.microsoft.com/syndicated-repo:syn-sharedtag1");
-        createdTags.ShouldContain("mcr.microsoft.com/syndicated-repo:syn-sharedtag2");
+        // Should return manifest for primary repo AND syndicated repo
+        results.Select(r => r.Tag).ShouldContain("mcr.microsoft.com/repo:sharedtag");
+        results.Select(r => r.Tag).ShouldContain("mcr.microsoft.com/syndicated-repo:syn-sharedtag1");
+        results.Select(r => r.Tag).ShouldContain("mcr.microsoft.com/syndicated-repo:syn-sharedtag2");
 
-        dockerServiceMock.Verify(o => o.CreateManifestList(
-            "mcr.microsoft.com/repo:sharedtag",
-            new[] { "mcr.microsoft.com/repo:tag1" },
-            false));
+        ManifestListInfo primaryManifest = results.Single(r => r.Tag == "mcr.microsoft.com/repo:sharedtag");
+        primaryManifest.PlatformTags.ShouldBe(["mcr.microsoft.com/repo:tag1"]);
 
-        dockerServiceMock.Verify(o => o.CreateManifestList(
-            "mcr.microsoft.com/syndicated-repo:syn-sharedtag1",
-            new[] { "mcr.microsoft.com/syndicated-repo:tag1" },
-            false));
+        ManifestListInfo synManifest1 = results.Single(r => r.Tag == "mcr.microsoft.com/syndicated-repo:syn-sharedtag1");
+        synManifest1.PlatformTags.ShouldBe(["mcr.microsoft.com/syndicated-repo:tag1"]);
 
-        dockerServiceMock.Verify(o => o.CreateManifestList(
-            "mcr.microsoft.com/syndicated-repo:syn-sharedtag2",
-            new[] { "mcr.microsoft.com/syndicated-repo:tag1" },
-            false));
+        ManifestListInfo synManifest2 = results.Single(r => r.Tag == "mcr.microsoft.com/syndicated-repo:syn-sharedtag2");
+        synManifest2.PlatformTags.ShouldBe(["mcr.microsoft.com/syndicated-repo:tag1"]);
     }
 
     /// <summary>
@@ -415,7 +371,7 @@ public class ManifestListServiceTests
     /// matching syndicated tags (not all platforms).
     /// </summary>
     [Fact]
-    public void CreateManifestLists_SyndicatedOnlyIncludesMatchingPlatforms()
+    public void GetManifestListsForChangedImages_SyndicatedOnlyIncludesMatchingPlatforms()
     {
         using TempFolderContext tempFolderContext = TestHelper.UseTempFolder();
 
@@ -476,34 +432,28 @@ public class ManifestListServiceTests
                     CreatePlatform(dockerfile1, simpleTags: ["tag1", "tag1-syndicated"]),
                     CreatePlatform(dockerfile2, simpleTags: ["tag2"]))));
 
-        Mock<IDockerService> dockerServiceMock = new();
-        ManifestListService service = CreateService(dockerServiceMock);
+        ManifestListService service = new();
         ManifestInfo manifestInfo = LoadManifest(manifest, tempFolderContext);
         ImageArtifactDetails linkedImageInfo = LoadImageInfo(imageArtifactDetails, manifestInfo, tempFolderContext);
 
-        service.CreateManifestLists(
-            manifestInfo, linkedImageInfo, repoPrefix: null, isDryRun: false);
+        IReadOnlyList<ManifestListInfo> results = service.GetManifestListsForChangedImages(
+            manifestInfo, linkedImageInfo, repoPrefix: null);
 
         // Primary manifest list should include both platforms
-        dockerServiceMock.Verify(o => o.CreateManifestList(
-            "mcr.microsoft.com/repo:sharedtag",
-            It.Is<IEnumerable<string>>(images =>
-                images.Contains("mcr.microsoft.com/repo:tag1") &&
-                images.Contains("mcr.microsoft.com/repo:tag2")),
-            false));
+        ManifestListInfo primaryManifest = results.Single(r => r.Tag == "mcr.microsoft.com/repo:sharedtag");
+        primaryManifest.PlatformTags.ShouldContain("mcr.microsoft.com/repo:tag1");
+        primaryManifest.PlatformTags.ShouldContain("mcr.microsoft.com/repo:tag2");
 
         // Syndicated manifest list should only include platform1 (the one with syndicated tags)
-        dockerServiceMock.Verify(o => o.CreateManifestList(
-            "mcr.microsoft.com/syndicated-repo:syn-sharedtag",
-            new[] { "mcr.microsoft.com/syndicated-repo:tag1-syndicated" },
-            false));
+        ManifestListInfo synManifest = results.Single(r => r.Tag == "mcr.microsoft.com/syndicated-repo:syn-sharedtag");
+        synManifest.PlatformTags.ShouldBe(["mcr.microsoft.com/syndicated-repo:tag1-syndicated"]);
     }
 
     /// <summary>
     /// Verifies that repo prefix is correctly applied to image names in manifest lists.
     /// </summary>
     [Fact]
-    public void CreateManifestLists_RepoPrefix()
+    public void GetManifestListsForChangedImages_RepoPrefix()
     {
         using TempFolderContext tempFolderContext = TestHelper.UseTempFolder();
 
@@ -523,27 +473,23 @@ public class ManifestListServiceTests
                     ["sharedtag"],
                     CreatePlatform(dockerfile, simpleTags: ["tag1"]))));
 
-        Mock<IDockerService> dockerServiceMock = new();
-        ManifestListService service = CreateService(dockerServiceMock);
+        ManifestListService service = new();
         ManifestInfo manifestInfo = LoadManifest(manifest, tempFolderContext);
         ImageArtifactDetails linkedImageInfo = LoadImageInfo(imageArtifactDetails, manifestInfo, tempFolderContext);
 
-        IReadOnlyList<string> createdTags = service.CreateManifestLists(
-            manifestInfo, linkedImageInfo, repoPrefix: "build/", isDryRun: false);
+        IReadOnlyList<ManifestListInfo> results = service.GetManifestListsForChangedImages(
+            manifestInfo, linkedImageInfo, repoPrefix: "build/");
 
-        createdTags.ShouldContain("myregistry.azurecr.io/build/repo:sharedtag");
-
-        dockerServiceMock.Verify(o => o.CreateManifestList(
-            "myregistry.azurecr.io/build/repo:sharedtag",
-            new[] { "myregistry.azurecr.io/build/repo:tag1" },
-            false));
+        results.Count.ShouldBe(1);
+        results[0].Tag.ShouldBe("myregistry.azurecr.io/build/repo:sharedtag");
+        results[0].PlatformTags.ShouldBe(["myregistry.azurecr.io/build/repo:tag1"]);
     }
 
     /// <summary>
     /// Verifies that the registry is included in manifest list tag and platform image names.
     /// </summary>
     [Fact]
-    public void CreateManifestLists_RegistryInImageNames()
+    public void GetManifestListsForChangedImages_RegistryInImageNames()
     {
         using TempFolderContext tempFolderContext = TestHelper.UseTempFolder();
 
@@ -563,24 +509,17 @@ public class ManifestListServiceTests
                     ["sharedtag"],
                     CreatePlatform(dockerfile, simpleTags: ["tag1"]))));
 
-        Mock<IDockerService> dockerServiceMock = new();
-        ManifestListService service = CreateService(dockerServiceMock);
+        ManifestListService service = new();
         ManifestInfo manifestInfo = LoadManifest(manifest, tempFolderContext);
         ImageArtifactDetails linkedImageInfo = LoadImageInfo(imageArtifactDetails, manifestInfo, tempFolderContext);
 
-        IReadOnlyList<string> createdTags = service.CreateManifestLists(
-            manifestInfo, linkedImageInfo, repoPrefix: null, isDryRun: false);
+        IReadOnlyList<ManifestListInfo> results = service.GetManifestListsForChangedImages(
+            manifestInfo, linkedImageInfo, repoPrefix: null);
 
-        createdTags.ShouldContain("mcr.microsoft.com/repo:sharedtag");
-
-        dockerServiceMock.Verify(o => o.CreateManifestList(
-            "mcr.microsoft.com/repo:sharedtag",
-            new[] { "mcr.microsoft.com/repo:tag1" },
-            false));
+        results.Count.ShouldBe(1);
+        results[0].Tag.ShouldBe("mcr.microsoft.com/repo:sharedtag");
+        results[0].PlatformTags.ShouldBe(["mcr.microsoft.com/repo:tag1"]);
     }
-
-    private static ManifestListService CreateService(Mock<IDockerService> dockerServiceMock) =>
-        new(dockerServiceMock.Object);
 
     private static ManifestInfo LoadManifest(Manifest manifest, TempFolderContext tempFolderContext)
     {

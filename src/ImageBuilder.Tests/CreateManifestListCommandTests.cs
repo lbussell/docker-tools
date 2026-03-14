@@ -309,7 +309,7 @@ public class CreateManifestListCommandTests
             dateTimeService,
             Mock.Of<IRegistryCredentialsProvider>(),
             Mock.Of<IAzureTokenCredentialProvider>(),
-            new ManifestListService(dockerServiceMock.Object));
+            new ManifestListService());
 
     private static void SetupCommand(
         CreateManifestListCommand command,

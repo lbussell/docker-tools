@@ -412,6 +412,6 @@ namespace Microsoft.DotNet.ImageBuilder.Tests
                 dockerServiceMock.Object,
                 Mock.Of<ILogger<PublishManifestCommand>>(),
                 Mock.Of<IRegistryCredentialsProvider>(),
-                new ManifestListService(dockerServiceMock.Object));
+                new ManifestListService());
     }
 }

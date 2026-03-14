@@ -9,23 +9,31 @@ using Microsoft.DotNet.ImageBuilder.ViewModel;
 namespace Microsoft.DotNet.ImageBuilder;
 
 /// <summary>
-/// Service for creating Docker manifest lists (multi-arch image indexes).
+/// Describes a Docker manifest list to be created - a multi-arch tag
+/// that references one or more platform-specific image tags.
+/// </summary>
+/// <param name="Tag">The fully-qualified manifest list tag (e.g., "mcr.microsoft.com/dotnet/aspnet:8.0").</param>
+/// <param name="PlatformTags">The fully-qualified platform image tags included in this manifest list.</param>
+public record ManifestListInfo(string Tag, IReadOnlyList<string> PlatformTags);
+
+/// <summary>
+/// Determines which Docker manifest lists should be created based on
+/// the manifest definition and which platforms were actually built.
 /// </summary>
 public interface IManifestListService
 {
     /// <summary>
-    /// Creates Docker manifest lists for all images with shared tags
-    /// that have at least one built (non-unchanged) platform in the image artifact details.
-    /// Only platforms present in <paramref name="imageArtifactDetails"/> are included in the manifest lists.
+    /// Returns the manifest lists that should be created for images that have
+    /// shared tags and at least one changed (non-cached) platform in
+    /// <paramref name="imageArtifactDetails"/>. Only platforms present in
+    /// <paramref name="imageArtifactDetails"/> are included in the results.
     /// </summary>
     /// <param name="manifest">The loaded manifest definition.</param>
-    /// <param name="imageArtifactDetails">Image info containing data about which platforms were actually built.</param>
+    /// <param name="imageArtifactDetails">Image info describing which platforms were actually built.</param>
     /// <param name="repoPrefix">Optional prefix to prepend to repository names.</param>
-    /// <param name="isDryRun">When true, manifest lists are not actually created.</param>
-    /// <returns>The list of manifest list tags that were created.</returns>
-    IReadOnlyList<string> CreateManifestLists(
+    /// <returns>Manifest list descriptors, each containing a tag and its platform image tags.</returns>
+    IReadOnlyList<ManifestListInfo> GetManifestListsForChangedImages(
         ManifestInfo manifest,
         ImageArtifactDetails imageArtifactDetails,
-        string? repoPrefix,
-        bool isDryRun);
+        string? repoPrefix);
 }
