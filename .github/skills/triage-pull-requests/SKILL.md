@@ -11,17 +11,29 @@ description: >-
 ### Step 1: List open pull requests
 
 ```shell
-gh pr list --state open --json number,title,author,headRefName
+gh pr list
 ```
 
-### Step 2: Check each PR's pipeline status
+### Step 2: Check each pull request's status
 
-For each open PR, run the `GetPullRequestStatus.cs` script from the `investigating-pull-request` skill:
+```shell
+gh pr view -c 1234
+```
+
+If a pull request has failing checks, run the `GetPullRequestStatus.cs` script from the `investigating-pull-request` skill:
 
 ```shell
 dotnet .github/skills/investigating-pull-request/scripts/GetPullRequestStatus.cs <number>
 ```
 
-### Step 3: Focus on failures
+Prioritize pull requests where pipeline runs show `FAIL` results. To get failing logs from Azure Pipelines checks, run the `GetTaskLog.cs` script using the `investigating-pipeline` skill. Investigate the failure and diagnose the root cause.
 
-Prioritize PRs where pipeline runs show `FAIL` results. For each failing build, use the `investigating-pipeline` skill to read task logs and diagnose the root cause.
+### Step 3: Summary
+
+For each pull request, determine:
+
+- Is this pull request ready to merge? If not, why?
+- Is this pull request stale? (1+ week old)
+- If there are failures, what is the root cause?
+- What comments still need to be addressed? Provide links to specific comments.
+
