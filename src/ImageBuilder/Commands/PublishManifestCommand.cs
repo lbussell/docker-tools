@@ -17,19 +17,16 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
         private readonly IDockerService _dockerService;
         private readonly ILogger<PublishManifestCommand> _logger;
         private readonly IRegistryCredentialsProvider _registryCredentialsProvider;
-        private readonly IManifestListService _manifestListService;
 
         public PublishManifestCommand(
             IManifestJsonService manifestJsonService,
             IDockerService dockerService,
             ILogger<PublishManifestCommand> logger,
-            IRegistryCredentialsProvider registryCredentialsProvider,
-            IManifestListService manifestListService) : base(manifestJsonService)
+            IRegistryCredentialsProvider registryCredentialsProvider) : base(manifestJsonService)
         {
             _dockerService = dockerService ?? throw new System.ArgumentNullException(nameof(dockerService));
             _logger = logger ?? throw new System.ArgumentNullException(nameof(logger));
             _registryCredentialsProvider = registryCredentialsProvider ?? throw new System.ArgumentNullException(nameof(registryCredentialsProvider));
-            _manifestListService = manifestListService ?? throw new System.ArgumentNullException(nameof(manifestListService));
         }
 
         protected override string Description => "Creates and publishes the manifest to the Docker Registry";
@@ -52,7 +49,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
                 () =>
                 {
                     IReadOnlyList<ManifestListInfo> manifestLists =
-                        _manifestListService.GetManifestListsForChangedImages(
+                        ManifestListHelper.GetManifestListsForChangedImages(
                             Manifest, imageArtifactDetails, Options.RepoPrefix);
 
                     foreach (ManifestListInfo manifestListInfo in manifestLists)

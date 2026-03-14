@@ -24,7 +24,6 @@ public class CreateManifestListCommand : ManifestCommand<CreateManifestListOptio
     private readonly IDateTimeService _dateTimeService;
     private readonly IRegistryCredentialsProvider _registryCredentialsProvider;
     private readonly IAzureTokenCredentialProvider _tokenCredentialProvider;
-    private readonly IManifestListService _manifestListService;
 
     public CreateManifestListCommand(
         IManifestJsonService manifestJsonService,
@@ -33,15 +32,13 @@ public class CreateManifestListCommand : ManifestCommand<CreateManifestListOptio
         ILogger<CreateManifestListCommand> logger,
         IDateTimeService dateTimeService,
         IRegistryCredentialsProvider registryCredentialsProvider,
-        IAzureTokenCredentialProvider tokenCredentialProvider,
-        IManifestListService manifestListService) : base(manifestJsonService)
+        IAzureTokenCredentialProvider tokenCredentialProvider) : base(manifestJsonService)
     {
         _dockerService = dockerService ?? throw new ArgumentNullException(nameof(dockerService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _dateTimeService = dateTimeService ?? throw new ArgumentNullException(nameof(dateTimeService));
         _registryCredentialsProvider = registryCredentialsProvider ?? throw new ArgumentNullException(nameof(registryCredentialsProvider));
         _tokenCredentialProvider = tokenCredentialProvider ?? throw new ArgumentNullException(nameof(tokenCredentialProvider));
-        _manifestListService = manifestListService ?? throw new ArgumentNullException(nameof(manifestListService));
 
         ArgumentNullException.ThrowIfNull(manifestServiceFactory);
         _manifestService = new Lazy<IManifestService>(() =>
@@ -68,7 +65,7 @@ public class CreateManifestListCommand : ManifestCommand<CreateManifestListOptio
             async () =>
             {
                 IReadOnlyList<ManifestListInfo> manifestLists =
-                    _manifestListService.GetManifestListsForChangedImages(
+                    ManifestListHelper.GetManifestListsForChangedImages(
                         Manifest, imageArtifactDetails, Options.RepoPrefix);
 
                 foreach (ManifestListInfo manifestListInfo in manifestLists)

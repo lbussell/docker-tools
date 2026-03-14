@@ -308,8 +308,7 @@ public class CreateManifestListCommandTests
             Mock.Of<ILogger<CreateManifestListCommand>>(),
             dateTimeService,
             Mock.Of<IRegistryCredentialsProvider>(),
-            Mock.Of<IAzureTokenCredentialProvider>(),
-            new ManifestListService());
+            Mock.Of<IAzureTokenCredentialProvider>());
 
     private static void SetupCommand(
         CreateManifestListCommand command,

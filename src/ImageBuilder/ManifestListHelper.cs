@@ -10,11 +10,27 @@ using Microsoft.DotNet.ImageBuilder.ViewModel;
 
 namespace Microsoft.DotNet.ImageBuilder;
 
-/// <inheritdoc/>
-public class ManifestListService : IManifestListService
+/// <summary>
+/// Describes a Docker manifest list to be created - a multi-arch tag
+/// that references one or more platform-specific image tags.
+/// </summary>
+/// <param name="Tag">The fully-qualified manifest list tag (e.g., "mcr.microsoft.com/dotnet/aspnet:8.0").</param>
+/// <param name="PlatformTags">The fully-qualified platform image tags included in this manifest list.</param>
+public record ManifestListInfo(string Tag, IReadOnlyList<string> PlatformTags);
+
+/// <summary>
+/// Determines which Docker manifest lists should be created based on
+/// the manifest definition and which platforms were actually built.
+/// </summary>
+public static class ManifestListHelper
 {
-    /// <inheritdoc/>
-    public IReadOnlyList<ManifestListInfo> GetManifestListsForChangedImages(
+    /// <summary>
+    /// Returns the manifest lists that should be created for images that have
+    /// shared tags and at least one changed (non-cached) platform in
+    /// <paramref name="imageArtifactDetails"/>. Only platforms present in
+    /// <paramref name="imageArtifactDetails"/> are included in the results.
+    /// </summary>
+    public static IReadOnlyList<ManifestListInfo> GetManifestListsForChangedImages(
         ManifestInfo manifest,
         ImageArtifactDetails imageArtifactDetails,
         string? repoPrefix)

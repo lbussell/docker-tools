@@ -19,7 +19,7 @@ using static Microsoft.DotNet.ImageBuilder.Tests.Helpers.ManifestHelper;
 
 namespace Microsoft.DotNet.ImageBuilder.Tests;
 
-public class ManifestListServiceTests
+public class ManifestListHelperTests
 {
     /// <summary>
     /// Verifies that a manifest list is returned containing all built platforms.
@@ -46,11 +46,11 @@ public class ManifestListServiceTests
                     CreatePlatform(dockerfile1, simpleTags: ["tag-amd64"]),
                     CreatePlatform(dockerfile2, simpleTags: ["tag-arm64"], architecture: "arm64"))));
 
-        ManifestListService service = new();
+        
         ManifestInfo manifestInfo = LoadManifest(manifest, tempFolderContext);
         ImageArtifactDetails linkedImageInfo = LoadImageInfo(imageArtifactDetails, manifestInfo, tempFolderContext);
 
-        IReadOnlyList<ManifestListInfo> results = service.GetManifestListsForChangedImages(
+        IReadOnlyList<ManifestListInfo> results = ManifestListHelper.GetManifestListsForChangedImages(
             manifestInfo, linkedImageInfo, repoPrefix: null);
 
         results.Count.ShouldBe(1);
@@ -89,11 +89,11 @@ public class ManifestListServiceTests
                     CreatePlatform(dockerfileAmd64, simpleTags: ["tag-amd64"]),
                     CreatePlatform(dockerfileArm64, simpleTags: ["tag-arm64"], architecture: "arm64"))));
 
-        ManifestListService service = new();
+        
         ManifestInfo manifestInfo = LoadManifest(manifest, tempFolderContext);
         ImageArtifactDetails linkedImageInfo = LoadImageInfo(imageArtifactDetails, manifestInfo, tempFolderContext);
 
-        IReadOnlyList<ManifestListInfo> results = service.GetManifestListsForChangedImages(
+        IReadOnlyList<ManifestListInfo> results = ManifestListHelper.GetManifestListsForChangedImages(
             manifestInfo, linkedImageInfo, repoPrefix: null);
 
         results.Count.ShouldBe(1);
@@ -132,11 +132,11 @@ public class ManifestListServiceTests
                     ["built-sharedtag"],
                     CreatePlatform(dockerfile2, simpleTags: ["tag2"]))));
 
-        ManifestListService service = new();
+        
         ManifestInfo manifestInfo = LoadManifest(manifest, tempFolderContext);
         ImageArtifactDetails linkedImageInfo = LoadImageInfo(imageArtifactDetails, manifestInfo, tempFolderContext);
 
-        IReadOnlyList<ManifestListInfo> results = service.GetManifestListsForChangedImages(
+        IReadOnlyList<ManifestListInfo> results = ManifestListHelper.GetManifestListsForChangedImages(
             manifestInfo, linkedImageInfo, repoPrefix: null);
 
         // Only the second image's manifest list should be returned
@@ -166,11 +166,11 @@ public class ManifestListServiceTests
                     ["sharedtag"],
                     CreatePlatform(dockerfile, simpleTags: ["tag1"], isUnchanged: true))));
 
-        ManifestListService service = new();
+        
         ManifestInfo manifestInfo = LoadManifest(manifest, tempFolderContext);
         ImageArtifactDetails linkedImageInfo = LoadImageInfo(imageArtifactDetails, manifestInfo, tempFolderContext);
 
-        IReadOnlyList<ManifestListInfo> results = service.GetManifestListsForChangedImages(
+        IReadOnlyList<ManifestListInfo> results = ManifestListHelper.GetManifestListsForChangedImages(
             manifestInfo, linkedImageInfo, repoPrefix: null);
 
         results.ShouldBeEmpty();
@@ -203,11 +203,11 @@ public class ManifestListServiceTests
                     CreatePlatform(dockerfileUnchanged, simpleTags: ["unchanged-tag"],
                         architecture: "arm64", isUnchanged: true))));
 
-        ManifestListService service = new();
+        
         ManifestInfo manifestInfo = LoadManifest(manifest, tempFolderContext);
         ImageArtifactDetails linkedImageInfo = LoadImageInfo(imageArtifactDetails, manifestInfo, tempFolderContext);
 
-        IReadOnlyList<ManifestListInfo> results = service.GetManifestListsForChangedImages(
+        IReadOnlyList<ManifestListInfo> results = ManifestListHelper.GetManifestListsForChangedImages(
             manifestInfo, linkedImageInfo, repoPrefix: null);
 
         results.Count.ShouldBe(1);
@@ -236,11 +236,11 @@ public class ManifestListServiceTests
                 CreateImageData(
                     CreatePlatform(dockerfile, simpleTags: ["tag1"]))));
 
-        ManifestListService service = new();
+        
         ManifestInfo manifestInfo = LoadManifest(manifest, tempFolderContext);
         ImageArtifactDetails linkedImageInfo = LoadImageInfo(imageArtifactDetails, manifestInfo, tempFolderContext);
 
-        IReadOnlyList<ManifestListInfo> results = service.GetManifestListsForChangedImages(
+        IReadOnlyList<ManifestListInfo> results = ManifestListHelper.GetManifestListsForChangedImages(
             manifestInfo, linkedImageInfo, repoPrefix: null);
 
         results.ShouldBeEmpty();
@@ -278,11 +278,11 @@ public class ManifestListServiceTests
                     ["sharedtag2"],
                     CreatePlatform(dockerfile))));
 
-        ManifestListService service = new();
+        
         ManifestInfo manifestInfo = LoadManifest(manifest, tempFolderContext);
         ImageArtifactDetails linkedImageInfo = LoadImageInfo(imageArtifactDetails, manifestInfo, tempFolderContext);
 
-        IReadOnlyList<ManifestListInfo> results = service.GetManifestListsForChangedImages(
+        IReadOnlyList<ManifestListInfo> results = ManifestListHelper.GetManifestListsForChangedImages(
             manifestInfo, linkedImageInfo, repoPrefix: null);
 
         results.Count.ShouldBe(2);
@@ -344,11 +344,11 @@ public class ManifestListServiceTests
                     ["sharedtag"],
                     CreatePlatform(dockerfile, simpleTags: ["tag1"]))));
 
-        ManifestListService service = new();
+        
         ManifestInfo manifestInfo = LoadManifest(manifest, tempFolderContext);
         ImageArtifactDetails linkedImageInfo = LoadImageInfo(imageArtifactDetails, manifestInfo, tempFolderContext);
 
-        IReadOnlyList<ManifestListInfo> results = service.GetManifestListsForChangedImages(
+        IReadOnlyList<ManifestListInfo> results = ManifestListHelper.GetManifestListsForChangedImages(
             manifestInfo, linkedImageInfo, repoPrefix: null);
 
         // Should return manifest for primary repo AND syndicated repo
@@ -432,11 +432,11 @@ public class ManifestListServiceTests
                     CreatePlatform(dockerfile1, simpleTags: ["tag1", "tag1-syndicated"]),
                     CreatePlatform(dockerfile2, simpleTags: ["tag2"]))));
 
-        ManifestListService service = new();
+        
         ManifestInfo manifestInfo = LoadManifest(manifest, tempFolderContext);
         ImageArtifactDetails linkedImageInfo = LoadImageInfo(imageArtifactDetails, manifestInfo, tempFolderContext);
 
-        IReadOnlyList<ManifestListInfo> results = service.GetManifestListsForChangedImages(
+        IReadOnlyList<ManifestListInfo> results = ManifestListHelper.GetManifestListsForChangedImages(
             manifestInfo, linkedImageInfo, repoPrefix: null);
 
         // Primary manifest list should include both platforms
@@ -473,11 +473,11 @@ public class ManifestListServiceTests
                     ["sharedtag"],
                     CreatePlatform(dockerfile, simpleTags: ["tag1"]))));
 
-        ManifestListService service = new();
+        
         ManifestInfo manifestInfo = LoadManifest(manifest, tempFolderContext);
         ImageArtifactDetails linkedImageInfo = LoadImageInfo(imageArtifactDetails, manifestInfo, tempFolderContext);
 
-        IReadOnlyList<ManifestListInfo> results = service.GetManifestListsForChangedImages(
+        IReadOnlyList<ManifestListInfo> results = ManifestListHelper.GetManifestListsForChangedImages(
             manifestInfo, linkedImageInfo, repoPrefix: "build/");
 
         results.Count.ShouldBe(1);
@@ -509,11 +509,11 @@ public class ManifestListServiceTests
                     ["sharedtag"],
                     CreatePlatform(dockerfile, simpleTags: ["tag1"]))));
 
-        ManifestListService service = new();
+        
         ManifestInfo manifestInfo = LoadManifest(manifest, tempFolderContext);
         ImageArtifactDetails linkedImageInfo = LoadImageInfo(imageArtifactDetails, manifestInfo, tempFolderContext);
 
-        IReadOnlyList<ManifestListInfo> results = service.GetManifestListsForChangedImages(
+        IReadOnlyList<ManifestListInfo> results = ManifestListHelper.GetManifestListsForChangedImages(
             manifestInfo, linkedImageInfo, repoPrefix: null);
 
         results.Count.ShouldBe(1);
