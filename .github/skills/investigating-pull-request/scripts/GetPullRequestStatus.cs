@@ -63,27 +63,7 @@ WriteLine($"- Branch: {prBranch}");
 WriteLine();
 
 // Separate Azure Pipelines check runs from other checks (e.g., GitHub Actions, CLA bots).
-Dictionary<int, PipelineRun> pipelines = [];
-List<(string Name, string State, string Link)> otherChecks = [];
-
-foreach (JsonElement check in checksJson.RootElement.EnumerateArray())
-{
-    string link = check.GetProperty("link").GetString() ?? "";
-    string checkName = check.GetProperty("name").GetString() ?? "";
-    string state = check.GetProperty("state").GetString() ?? "";
-
-    if (!TryParseAzureDevOpsUrl(link, out string? org, out string? project, out int buildId))
-    {
-        otherChecks.Add((checkName, state, link));
-        continue;
-    }
-
-    // The top-level pipeline check run has no job suffix in parentheses
-    bool isTopLevel = !checkName.Contains(" (");
-
-    if (!pipelines.TryGetValue(buildId, out PipelineRun? existing) || (isTopLevel && !existing.IsTopLevel))
-        pipelines[buildId] = new PipelineRun(checkName, buildId, org, project, isTopLevel);
-}
+(Dictionary<int, PipelineRun> pipelines, List<OtherCheck> otherChecks) = ClassifyCheckRuns(checksJson);
 
 if (pipelines.Count == 0 && otherChecks.Count == 0)
 {
@@ -139,16 +119,16 @@ if (otherChecks.Count > 0)
     WriteLine("## Other Checks");
     WriteLine();
     WriteLine("| Check | Result | URL |");
-    foreach ((string name, string state, string link) in otherChecks.OrderBy(c => c.Name))
+    foreach (OtherCheck otherCheck in otherChecks.OrderBy(c => c.Name))
     {
-        string statusText = state switch
+        string statusText = otherCheck.State switch
         {
             "SUCCESS" => "OK",
             "FAILURE" => "FAIL",
             "PENDING" or "EXPECTED" => "PENDING",
-            _ => state,
+            _ => otherCheck.State,
         };
-        WriteLine($"| {name} | {statusText} | {link} |");
+        WriteLine($"| {otherCheck.Name} | {statusText} | {otherCheck.Link} |");
     }
     WriteLine();
 }
@@ -163,6 +143,44 @@ static async Task<JsonDocument> RunGhJsonAsync(params IEnumerable<string> argume
     string response = await ProcessHelper.RunAsync("gh", arguments.ToArray());
     JsonDocument responseJson = JsonDocument.Parse(response);
     return responseJson ?? throw new InvalidOperationException("Failed to parse JSON response.");
+}
+
+/// <summary>
+/// Classifies check runs into Azure Pipelines runs (grouped by build ID) and other checks.
+/// Azure Pipelines reports one check run per job, so we deduplicate by build ID, preferring the
+/// top-level pipeline entry (the one without a job name in parentheses).
+/// </summary>
+static (Dictionary<int, PipelineRun> Pipelines, List<OtherCheck> OtherChecks) ClassifyCheckRuns(
+    JsonDocument checksJson)
+{
+    Dictionary<int, PipelineRun> pipelines = [];
+    List<OtherCheck> otherChecks = [];
+
+    foreach (JsonElement checkRun in checksJson.RootElement.EnumerateArray())
+    {
+        string detailsLink = checkRun.GetProperty("link").GetString() ?? "";
+        string name = checkRun.GetProperty("name").GetString() ?? "";
+        string state = checkRun.GetProperty("state").GetString() ?? "";
+
+        if (!TryParseAzureDevOpsUrl(detailsLink, out string? org, out string? project, out int buildId))
+        {
+            otherChecks.Add(new OtherCheck(name, state, detailsLink));
+            continue;
+        }
+
+        // Azure Pipelines reports a top-level check (e.g., "my-pipeline") plus per-job checks
+        // (e.g., "my-pipeline (Build Linux_amd64)"). Keep the top-level entry when available.
+        bool isTopLevelPipelineCheck = !name.Contains(" (");
+        bool shouldReplace = !pipelines.ContainsKey(buildId)
+            || (isTopLevelPipelineCheck && !pipelines[buildId].IsTopLevel);
+
+        if (shouldReplace)
+        {
+            pipelines[buildId] = new PipelineRun(name, buildId, org, project, isTopLevelPipelineCheck);
+        }
+    }
+
+    return (pipelines, otherChecks);
 }
 
 /// <summary>
@@ -202,3 +220,4 @@ static bool TryParseAzureDevOpsUrl(
 }
 
 record PipelineRun(string Name, int BuildId, string Org, string Project, bool IsTopLevel);
+record OtherCheck(string Name, string State, string Link);
