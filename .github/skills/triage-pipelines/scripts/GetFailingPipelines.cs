@@ -35,22 +35,29 @@ folder = @"\" + folder.Trim('\\', '/').Replace('/', '\\');
 using AzureDevOpsClient client = AzureDevOpsClient.Create(project: project);
 
 DefinitionsResponse buildDefinitions = await client.GetBuildDefinitionsAsync(folder);
-List<BuildDefinitionReference> failingBuilds = buildDefinitions
-    .Value.Where(definition => definition.LatestCompletedBuild is { Result: "failed" })
+List<BuildDefinitionReference> unhealthyPipelines = buildDefinitions
+    .Value.Where(definition => definition.LatestCompletedBuild is { Result: "failed" or "partiallySucceeded" })
     .ToList();
 
-if (failingBuilds.Count == 0)
+if (unhealthyPipelines.Count == 0)
 {
-    WriteLine("No failing pipelines found.");
+    WriteLine("No failing or warning pipelines found.");
     return;
 }
 
-WriteLine($"Found {failingBuilds.Count} failing pipeline(s):\n");
+WriteLine($"Found {unhealthyPipelines.Count} unhealthy pipeline(s):\n");
 
-foreach (BuildDefinitionReference def in failingBuilds)
+foreach (BuildDefinitionReference def in unhealthyPipelines)
 {
     ApiBuild build = def.LatestCompletedBuild!;
+    string result = build.Result switch
+    {
+        "failed" => "Failed",
+        "partiallySucceeded" => "SucceededWithIssues",
+        _ => build.Result ?? "unknown",
+    };
     WriteLine($"Pipeline: {def.Name}");
+    WriteLine($"  Result: {result}");
     WriteLine($"  Commit: {build.SourceVersion ?? "unknown"}");
     WriteLine($"  Link:   {client.GetBuildResultUrl(build.Id)}");
     WriteLine();

@@ -105,15 +105,15 @@ public static class BuildTimelineRendering
     private static string FormatResult(TimelineRecord record) =>
         record.Result switch
         {
-            "succeeded" => "OK",
-            "failed" => "FAIL",
-            "skipped" => "SKIP",
-            "canceled" => "CANCEL",
-            "succeededWithIssues" => "WARN",
+            "succeeded" => "Succeeded",
+            "failed" => "Failed",
+            "skipped" => "Skipped",
+            "canceled" => "Canceled",
+            "succeededWithIssues" => "SucceededWithIssues",
             _ => record.State switch
             {
-                "inProgress" => "RUNNING",
-                "pending" => "PENDING",
+                "inProgress" => "InProgress",
+                "pending" => "Pending",
                 _ => "-"
             }
         };

@@ -123,9 +123,9 @@ if (otherChecks.Count > 0)
     {
         string statusText = otherCheck.State switch
         {
-            "SUCCESS" => "OK",
-            "FAILURE" => "FAIL",
-            "PENDING" or "EXPECTED" => "PENDING",
+            "SUCCESS" => "Succeeded",
+            "FAILURE" => "Failed",
+            "PENDING" or "EXPECTED" => "Pending",
             _ => otherCheck.State,
         };
         WriteLine($"| {otherCheck.Name} | {statusText} | {otherCheck.Link} |");
