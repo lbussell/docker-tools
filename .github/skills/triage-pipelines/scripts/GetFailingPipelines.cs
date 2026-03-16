@@ -50,12 +50,7 @@ WriteLine($"Found {unhealthyPipelines.Count} unhealthy pipeline(s):\n");
 foreach (BuildDefinitionReference def in unhealthyPipelines)
 {
     ApiBuild build = def.LatestCompletedBuild!;
-    string result = build.Result switch
-    {
-        "failed" => "Failed",
-        "partiallySucceeded" => "SucceededWithIssues",
-        _ => build.Result ?? "unknown",
-    };
+    string result = BuildTimelineRendering.FormatBuildResult(build.Result);
     WriteLine($"Pipeline: {def.Name}");
     WriteLine($"  Result: {result}");
     WriteLine($"  Commit: {build.SourceVersion ?? "unknown"}");

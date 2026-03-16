@@ -42,9 +42,11 @@ if (roots.Count == 0)
 
 Func<TimelineNode, bool>? filter = showAll
     ? null
-    : node => node.Record.Type is not "Task" || node.Record.Result is "failed";
+    : node => node.Record.Type is not "Task" || node.Record.Result is "failed" or "succeededWithIssues";
 
-string timelineLabel = $"{build.Definition.Name} - Build {buildId} ({client.GetBuildResultUrl(buildId)}):";
+string buildResult = BuildTimelineRendering.FormatBuildResult(build.Result);
+string stageCount = roots.Count > 0 ? $" ({roots.Count} Stages)" : "";
+string timelineLabel = $"Build #{buildId}: {build.Definition.Name} | {buildResult}{stageCount} | {client.GetBuildResultUrl(buildId)}";
 Spectre.Console.Tree buildTimelineTree = BuildTimelineRendering.RenderTree(roots, timelineLabel, filter);
 Write(buildTimelineTree);
 WriteLine();

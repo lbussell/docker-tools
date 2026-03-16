@@ -102,6 +102,19 @@ public static class BuildTimelineRendering
         return $"{node.Record.Type}{logId}: {node.Record.Name} | {result}{childCount}";
     }
 
+    /// <summary>
+    /// Formats a build-level result string (from the Builds API) into its canonical display name.
+    /// </summary>
+    public static string FormatBuildResult(string? result) =>
+        result switch
+        {
+            "succeeded" => "Succeeded",
+            "failed" => "Failed",
+            "canceled" => "Canceled",
+            "partiallySucceeded" => "SucceededWithIssues",
+            _ => result ?? "-"
+        };
+
     private static string FormatResult(TimelineRecord record) =>
         record.Result switch
         {

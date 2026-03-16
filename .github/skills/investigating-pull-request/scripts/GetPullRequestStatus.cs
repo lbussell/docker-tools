@@ -73,7 +73,7 @@ if (pipelines.Count == 0 && otherChecks.Count == 0)
 
 Func<TimelineNode, bool>? filter = showAll
     ? null
-    : node => node.Record.Type is not "Task" || node.Record.Result is "failed";
+    : node => node.Record.Type is not "Task" || node.Record.Result is "failed" or "succeededWithIssues";
 
 // Group pipeline runs by (org, project) so we can share AzureDevOpsClient instances
 IEnumerable<IGrouping<(string Org, string Project), PipelineRun>> groups =
@@ -97,8 +97,9 @@ foreach (IGrouping<(string Org, string Project), PipelineRun> group in groups)
         TimelineResponse timeline = await client.GetBuildTimelineAsync(pipeline.BuildId);
         IReadOnlyList<TimelineNode> roots = timeline.BuildTree();
 
-        string buildResultUrl = client.GetBuildResultUrl(pipeline.BuildId);
-        string label = $"Azure Pipelines: {build.Definition.Name} - Build {pipeline.BuildId} ({buildResultUrl}):";
+        string buildResult = BuildTimelineRendering.FormatBuildResult(build.Result);
+        string stageCount = roots.Count > 0 ? $" ({roots.Count} Stages)" : "";
+        string label = $"Build #{pipeline.BuildId}: {build.Definition.Name} | {buildResult}{stageCount} | {client.GetBuildResultUrl(pipeline.BuildId)}";
 
         if (roots.Count == 0)
         {

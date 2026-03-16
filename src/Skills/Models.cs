@@ -35,9 +35,10 @@ public record ApiBuild(int Id, string? Result, string? SourceVersion);
 /// Details of a single build from the Azure DevOps Builds - Get API.
 /// </summary>
 /// <param name="Id">The unique ID of the build.</param>
+/// <param name="Result">The result of the build (e.g., "succeeded", "failed", "partiallySucceeded").</param>
 /// <param name="Definition">The pipeline definition that produced this build.</param>
 /// <seealso href="https://learn.microsoft.com/en-us/rest/api/azure/devops/build/builds/get?view=azure-devops-rest-7.1#build" />
-public record BuildDetail(int Id, BuildDefinitionInfo Definition);
+public record BuildDetail(int Id, string? Result, BuildDefinitionInfo Definition);
 
 /// <summary>
 /// Minimal info about a build's pipeline definition.
