@@ -92,7 +92,6 @@ public static class ImageBuilder
             builder.Services.AddSingleton<ICommand, MergeImageInfoCommand>();
             builder.Services.AddSingleton<ICommand, PostPublishNotificationCommand>();
             builder.Services.AddSingleton<ICommand, PublishImageInfoCommand>();
-            builder.Services.AddSingleton<ICommand, PublishManifestCommand>();
             builder.Services.AddSingleton<ICommand, PublishMcrDocsCommand>();
             builder.Services.AddSingleton<ICommand, PullImagesCommand>();
             builder.Services.AddSingleton<ICommand, QueueBuildCommand>();
