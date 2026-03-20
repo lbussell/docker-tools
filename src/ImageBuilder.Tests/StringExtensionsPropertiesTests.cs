@@ -26,11 +26,11 @@ public sealed class StringExtensionsPropertiesTests
         "target\r\n\r\n",
     ];
 
-    private static readonly Gen<string> AlphaNumericStringGen = Gen.Char[AlphaNumericCharacters]
+    private static readonly Gen<string> AlphaNumericStringGen = Gen.Char.AlphaNumeric
         .Array[0, 40]
         .Select(characters => new string(characters));
 
-    private static readonly Gen<string> NonEmptyAlphaNumericStringGen = Gen.Char[AlphaNumericCharacters]
+    private static readonly Gen<string> NonEmptyAlphaNumericStringGen = Gen.Char.AlphaNumeric
         .Array[1, 8]
         .Select(characters => new string(characters));
 
