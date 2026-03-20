@@ -2,6 +2,7 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System.Linq;
 using CsCheck;
 
 namespace Microsoft.DotNet.ImageBuilder.Tests.Generators;
@@ -10,7 +11,7 @@ namespace Microsoft.DotNet.ImageBuilder.Tests.Generators;
 /// CsCheck generators for <see cref="ImageName"/> components and complete image references,
 /// following Docker's distribution reference grammar and OCI digest specifications.
 /// </summary>
-internal static class ImageNameGenerator
+public static class ImageNameGenerator
 {
     #region Registry
 
@@ -24,27 +25,27 @@ internal static class ImageNameGenerator
     // domain names, optional ports, `localhost`, IPv4, and bracketed IPv6.
     // https://github.com/distribution/reference/blob/main/reference.go
     // https://github.com/distribution/reference/blob/main/regexp.go
-    private static readonly Gen<string> DomainLabelGen = Gen.Select(
+    private static readonly Gen<string> AnyDomainLabel = Gen.Select(
         Gen.Char[DomainLabelBoundaryCharacters],
         Gen.Char[DomainLabelMiddleCharacters].Array[0, 10],
         Gen.Char[DomainLabelBoundaryCharacters],
         BuildDomainLabel);
 
-    private static readonly Gen<string> DomainGen = DomainLabelGen.Array[2, 3]
+    private static readonly Gen<string> AnyDomain = AnyDomainLabel.Array[2, 3]
         .Select(labels => string.Join(".", labels));
 
-    private static readonly Gen<string> PortGen = Gen.Int[1, 65535]
+    private static readonly Gen<string> AnyPort = Gen.Int[1, 65535]
         .Select(port => port.ToString());
 
-    internal static readonly Gen<string> ExplicitRegistryGen = Gen.OneOf(
-        DomainGen,
-        Gen.Select(DomainGen, PortGen, (domain, port) => $"{domain}:{port}"),
+    public static readonly Gen<string> AnyRegistry = Gen.OneOf(
+        AnyDomain,
+        Gen.Select(AnyDomain, AnyPort, (domain, port) => $"{domain}:{port}"),
         Gen.OneOfConst("localhost"),
-        PortGen.Select(port => $"localhost:{port}"),
+        AnyPort.Select(port => $"localhost:{port}"),
         Gen.OneOfConst("127.0.0.1"),
-        PortGen.Select(port => $"127.0.0.1:{port}"),
+        AnyPort.Select(port => $"127.0.0.1:{port}"),
         Gen.OneOfConst("[2001:db8::1]"),
-        PortGen.Select(port => $"[2001:db8::1]:{port}"));
+        AnyPort.Select(port => $"[2001:db8::1]:{port}"));
 
     private static string BuildDomainLabel(char firstCharacter, char[] middleCharacters, char lastCharacter) =>
         middleCharacters.Length == 0
@@ -57,7 +58,7 @@ internal static class ImageNameGenerator
 
     // Docker distribution caps repository names at 255 chars:
     // https://github.com/distribution/reference/blob/main/reference.go
-    internal const int MaxRepositoryLength = 255;
+    public const int MaxRepositoryLength = 255;
 
     // Repository path-components use Docker's lowercase `alpha-numeric` grammar:
     // /[a-z0-9]+/
@@ -68,57 +69,48 @@ internal static class ImageNameGenerator
     // The implicit variants keep the first segment safely out of explicit-registry territory.
     // https://github.com/distribution/reference/blob/main/reference.go
     // https://github.com/distribution/reference/blob/main/regexp.go
-    private static readonly Gen<string> RepoAtomGen = Gen.Char[RepoAtomCharacters]
+    private static readonly Gen<string> AnyRepoSegment = Gen.Char[RepoAtomCharacters]
         .Array[1, 8]
         .Select(characters => new string(characters));
 
     // Docker repository separators are `[_.]`, `__`, or repeated `-`.
     // https://github.com/distribution/reference/blob/main/reference.go
-    private static readonly Gen<string> RepoSeparatorGen =
+    private static readonly Gen<string> AnyRepoSeparator =
         Gen.OneOfConst(".", "_", "__", "-", "--", "---");
 
     // The implicit Docker Hub generators intentionally exclude `.` in the first segment because
     // the parser treats `.` there as an explicit registry boundary.
-    private static readonly Gen<string> ImplicitRepoSeparatorGen =
+    private static readonly Gen<string> AnyImplicitRepoSeparator =
         Gen.OneOfConst("_", "__", "-", "--", "---");
 
-    private static readonly Gen<string> RepoComponentGen = Gen.Select(
-        RepoAtomGen.Array[1, 4],
-        RepoSeparatorGen.Array[3],
+    private static readonly Gen<string> AnyRepoComponent = Gen.Select(
+        AnyRepoSegment.Array[1, 4],
+        AnyRepoSeparator.Array[3],
         BuildRepositoryComponent);
 
-    private static readonly Gen<string> ImplicitRepoComponentGen = Gen.Select(
-        RepoAtomGen.Array[1, 4],
-        ImplicitRepoSeparatorGen.Array[3],
+    private static readonly Gen<string> AnyImplicitRepoComponent = Gen.Select(
+        AnyRepoSegment.Array[1, 4],
+        AnyImplicitRepoSeparator.Array[3],
         BuildRepositoryComponent);
 
-    internal static readonly Gen<string> SingleSegmentRepoGen = RepoComponentGen;
+    public static readonly Gen<string> AnySingleSegmentRepo = AnyRepoComponent;
 
-    internal static readonly Gen<string> ImplicitSingleSegmentRepoGen = ImplicitRepoComponentGen;
+    public static readonly Gen<string> AnyImplicitSingleSegmentRepo = AnyImplicitRepoComponent;
 
-    internal static readonly Gen<string> MultiSegmentRepoGen = RepoComponentGen.Array[2, 4]
+    public static readonly Gen<string> AnyMultiSegmentRepo = AnyRepoComponent.Array[2, 4]
         .Select(segments => string.Join("/", segments));
 
-    internal static readonly Gen<string> ImplicitMultiSegmentRepoGen = ImplicitRepoComponentGen.Array[2, 4]
+    public static readonly Gen<string> AnyImplicitMultiSegmentRepo = AnyImplicitRepoComponent.Array[2, 4]
         .Select(segments => string.Join("/", segments));
 
-    internal static readonly Gen<string> RepoGen = RepoComponentGen.Array[1, 4]
+    public static readonly Gen<string> AnyRepo = AnyRepoComponent.Array[1, 4]
         .Select(segments => string.Join("/", segments));
 
-    internal static readonly Gen<string> ImplicitRepoGen = ImplicitRepoComponentGen.Array[1, 4]
+    public static readonly Gen<string> AnyImplicitRepo = AnyImplicitRepoComponent.Array[1, 4]
         .Select(segments => string.Join("/", segments));
 
-    private static string BuildRepositoryComponent(string[] atoms, string[] separators)
-    {
-        string component = atoms[0];
-
-        for (int i = 1; i < atoms.Length; i++)
-        {
-            component += separators[i - 1] + atoms[i];
-        }
-
-        return component;
-    }
+    private static string BuildRepositoryComponent(string[] segments, string[] separators) =>
+        segments[0] + string.Concat(segments.Skip(1).Zip(separators, (seg, sep) => sep + seg));
 
     #endregion
 
@@ -126,7 +118,7 @@ internal static class ImageNameGenerator
 
     // Docker distribution caps tags at 128 chars:
     // https://github.com/distribution/reference/blob/main/regexp.go
-    internal const int MaxTagLength = 128;
+    public const int MaxTagLength = 128;
 
     // Tags follow Docker's `[\w][\w.-]{0,127}` rule.
     // https://github.com/distribution/reference/blob/main/regexp.go
@@ -135,13 +127,13 @@ internal static class ImageNameGenerator
 
     // We keep tags short in the random generator and cover the 128-char boundary
     // explicitly in a dedicated test.
-    internal static readonly Gen<string> TagGen = Gen.Select(
+    public static readonly Gen<string> ImageTag = Gen.Select(
         Gen.Char[TagFirstCharacters],
         Gen.Char[TagRestCharacters].Array[0, 31],
         (firstCharacter, remainingCharacters) => firstCharacter + new string(remainingCharacters));
 
-    internal static readonly Gen<string> OptionalTagGen =
-        Gen.OneOf(Gen.OneOfConst(string.Empty), TagGen);
+    public static readonly Gen<string> OptionalImageTag =
+        Gen.OneOf(Gen.OneOfConst(string.Empty), ImageTag);
 
     #endregion
 
@@ -149,8 +141,8 @@ internal static class ImageNameGenerator
 
     // OCI registered digest lengths for the algorithms we intentionally bias toward:
     // https://github.com/opencontainers/image-spec/blob/main/descriptor.md#registered-algorithms
-    internal const int Sha256HexLength = 64;
-    internal const int Sha512HexLength = 128;
+    public const int Sha256HexLength = 64;
+    public const int Sha512HexLength = 128;
 
     // OCI registered sha256 and sha512 digests are lowercase hex.
     // https://github.com/opencontainers/image-spec/blob/main/descriptor.md#registered-algorithms
@@ -160,21 +152,21 @@ internal static class ImageNameGenerator
     // sha256 and sha512 forms because those are the most relevant real-world cases here.
     // https://github.com/opencontainers/image-spec/blob/main/descriptor.md#digests
     // https://github.com/opencontainers/image-spec/blob/main/descriptor.md#registered-algorithms
-    private static readonly Gen<string> Sha256DigestGen = Gen.Char[DigestHexCharacters]
+    private static readonly Gen<string> AnySha256Digest = Gen.Char[DigestHexCharacters]
         .Array[Sha256HexLength]
         .Select(characters => $"sha256:{new string(characters)}");
 
-    private static readonly Gen<string> Sha512DigestGen = Gen.Char[DigestHexCharacters]
+    private static readonly Gen<string> AnySha512Digest = Gen.Char[DigestHexCharacters]
         .Array[Sha512HexLength]
         .Select(characters => $"sha512:{new string(characters)}");
 
-    internal static readonly Gen<string> DigestGen =
-        Gen.OneOf(Sha256DigestGen, Sha512DigestGen);
+    public static readonly Gen<string> ImageDigest =
+        Gen.OneOf(AnySha256Digest, AnySha512Digest);
 
-    internal static readonly Gen<string> OptionalDigestGen =
-        Gen.OneOf(Gen.OneOfConst(string.Empty), DigestGen);
+    public static readonly Gen<string> OptionalImageDigest =
+        Gen.OneOf(Gen.OneOfConst(string.Empty), ImageDigest);
 
-    internal static string CreateDigest(string algorithm, int encodedLength, char encodedCharacter) =>
+    public static string CreateDigest(string algorithm, int encodedLength, char encodedCharacter) =>
         $"{algorithm}:{new string(encodedCharacter, encodedLength)}";
 
     #endregion
@@ -183,37 +175,37 @@ internal static class ImageNameGenerator
 
     // Keep explicit-registry and implicit-Docker-Hub image generators separate so the tests
     // can intentionally exercise both sides of Docker's name parsing split.
-    internal static readonly Gen<ImageName> ExplicitRegistryImageNameGen = Gen.Select(
-        ExplicitRegistryGen,
-        RepoGen,
-        OptionalTagGen,
-        OptionalDigestGen,
+    public static readonly Gen<ImageName> ImageNameWithExplicitRegistry = Gen.Select(
+        AnyRegistry,
+        AnyRepo,
+        OptionalImageTag,
+        OptionalImageDigest,
         (registry, repo, tag, digest) => new ImageName(registry, repo, tag, digest));
 
-    internal static readonly Gen<ImageName> ImplicitRegistryImageNameGen = Gen.Select(
-        ImplicitRepoGen,
-        OptionalTagGen,
-        OptionalDigestGen,
+    public static readonly Gen<ImageName> ImageNameWithImplicitRegistry = Gen.Select(
+        AnyImplicitRepo,
+        OptionalImageTag,
+        OptionalImageDigest,
         (repo, tag, digest) => new ImageName(string.Empty, repo, tag, digest));
 
-    internal static readonly Gen<ImageName> ImageNameGen =
-        Gen.OneOf(ImplicitRegistryImageNameGen, ExplicitRegistryImageNameGen);
+    public static readonly Gen<ImageName> AnyImageName =
+        Gen.OneOf(ImageNameWithImplicitRegistry, ImageNameWithExplicitRegistry);
 
-    internal static readonly Gen<ImageName> ExplicitRegistryImageNameWithTagAndDigestGen = Gen.Select(
-        ExplicitRegistryGen,
-        RepoGen,
-        TagGen,
-        DigestGen,
+    public static readonly Gen<ImageName> ImageNameWithExplicitRegistryTagAndDigest = Gen.Select(
+        AnyRegistry,
+        AnyRepo,
+        ImageTag,
+        ImageDigest,
         (registry, repo, tag, digest) => new ImageName(registry, repo, tag, digest));
 
-    internal static readonly Gen<ImageName> ImplicitRegistryImageNameWithTagAndDigestGen = Gen.Select(
-        ImplicitRepoGen,
-        TagGen,
-        DigestGen,
+    public static readonly Gen<ImageName> ImageNameWithImplicitRegistryTagAndDigest = Gen.Select(
+        AnyImplicitRepo,
+        ImageTag,
+        ImageDigest,
         (repo, tag, digest) => new ImageName(string.Empty, repo, tag, digest));
 
-    internal static readonly Gen<ImageName> ImageNameWithTagAndDigestGen =
-        Gen.OneOf(ImplicitRegistryImageNameWithTagAndDigestGen, ExplicitRegistryImageNameWithTagAndDigestGen);
+    public static readonly Gen<ImageName> AnyImageNameWithTagAndDigest =
+        Gen.OneOf(ImageNameWithImplicitRegistryTagAndDigest, ImageNameWithExplicitRegistryTagAndDigest);
 
     #endregion
 }

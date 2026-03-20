@@ -17,8 +17,8 @@ public sealed class ImageNameTests
     public void Parse_PreservesTagAndDigestWhenBothArePresent()
     {
         Check.Sample(
-            ImageNameWithTagAndDigestGen,
-            imageName => AssertEquivalent(ImageName.Parse(imageName.ToString()), imageName),
+            AnyImageNameWithTagAndDigest,
+            imageName => ImageName.Parse(imageName.ToString()).ShouldBe(imageName),
             iter: PropertyIterationCount);
     }
 
@@ -26,8 +26,8 @@ public sealed class ImageNameTests
     public void Parse_AndToString_RoundTripWithoutAutoResolve()
     {
         Check.Sample(
-            ImageNameGen,
-            imageName => AssertEquivalent(ImageName.Parse(imageName.ToString()), imageName),
+            AnyImageName,
+            imageName => ImageName.Parse(imageName.ToString()).ShouldBe(imageName),
             iter: PropertyIterationCount);
     }
 
@@ -35,7 +35,7 @@ public sealed class ImageNameTests
     public void Parse_WithAutoResolve_AddsDockerHubDefaultsForSingleSegmentRepos()
     {
         Check.Sample(
-            Gen.Select(ImplicitSingleSegmentRepoGen, OptionalTagGen, OptionalDigestGen),
+            Gen.Select(AnyImplicitSingleSegmentRepo, OptionalImageTag, OptionalImageDigest),
             input =>
             {
                 string repo = input.Item1;
@@ -56,7 +56,7 @@ public sealed class ImageNameTests
     public void Parse_WithAutoResolve_PreservesMultiSegmentDockerHubRepos()
     {
         Check.Sample(
-            Gen.Select(ImplicitMultiSegmentRepoGen, OptionalTagGen, OptionalDigestGen),
+            Gen.Select(AnyImplicitMultiSegmentRepo, OptionalImageTag, OptionalImageDigest),
             input =>
             {
                 string repo = input.Item1;
@@ -77,12 +77,12 @@ public sealed class ImageNameTests
     public void Parse_WithAutoResolve_PreservesExplicitRegistries()
     {
         Check.Sample(
-            Gen.Select(ExplicitRegistryGen, RepoGen, OptionalTagGen, OptionalDigestGen),
+            Gen.Select(AnyRegistry, AnyRepo, OptionalImageTag, OptionalImageDigest),
             input =>
             {
                 ImageName imageName = new ImageName(input.Item1, input.Item2, input.Item3, input.Item4);
 
-                AssertEquivalent(ImageName.Parse(imageName.ToString(), autoResolveImpliedNames: true), imageName);
+                ImageName.Parse(imageName.ToString(), autoResolveImpliedNames: true).ShouldBe(imageName);
             },
             iter: PropertyIterationCount);
     }
@@ -110,7 +110,7 @@ public sealed class ImageNameTests
         string repo = new string('a', MaxRepositoryLength);
         ImageName imageName = new ImageName("example.com", repo, "latest", null);
 
-        AssertEquivalent(ImageName.Parse(imageName.ToString()), imageName);
+        ImageName.Parse(imageName.ToString()).ShouldBe(imageName);
     }
 
     [Fact]
@@ -119,7 +119,7 @@ public sealed class ImageNameTests
         string tag = "_" + new string('A', MaxTagLength - 3) + ".-";
         ImageName imageName = new ImageName("example.com", "repo", tag, null);
 
-        AssertEquivalent(ImageName.Parse(imageName.ToString()), imageName);
+        ImageName.Parse(imageName.ToString()).ShouldBe(imageName);
     }
 
     [Fact]
@@ -127,7 +127,7 @@ public sealed class ImageNameTests
     {
         ImageName imageName = new ImageName("example.com", "a.b/a__b/a---c", "_tag.1-2", null);
 
-        AssertEquivalent(ImageName.Parse(imageName.ToString()), imageName);
+        ImageName.Parse(imageName.ToString()).ShouldBe(imageName);
     }
 
     [Fact]
@@ -136,8 +136,8 @@ public sealed class ImageNameTests
         ImageName sha256ImageName = new ImageName("example.com", "repo", null, CreateDigest("sha256", Sha256HexLength, 'a'));
         ImageName sha512ImageName = new ImageName("example.com", "repo", null, CreateDigest("sha512", Sha512HexLength, 'b'));
 
-        AssertEquivalent(ImageName.Parse(sha256ImageName.ToString()), sha256ImageName);
-        AssertEquivalent(ImageName.Parse(sha512ImageName.ToString()), sha512ImageName);
+        ImageName.Parse(sha256ImageName.ToString()).ShouldBe(sha256ImageName);
+        ImageName.Parse(sha512ImageName.ToString()).ShouldBe(sha512ImageName);
     }
 
     [Fact]
@@ -180,11 +180,4 @@ public sealed class ImageNameTests
         roundTripped.ShouldBe(original);
     }
 
-    private static void AssertEquivalent(ImageName actual, ImageName expected)
-    {
-        actual.Registry.ShouldBe(expected.Registry);
-        actual.Repo.ShouldBe(expected.Repo);
-        actual.Tag.ShouldBe(expected.Tag);
-        actual.Digest.ShouldBe(expected.Digest);
-    }
 }
