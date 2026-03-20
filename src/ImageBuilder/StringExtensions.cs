@@ -66,10 +66,14 @@ namespace Microsoft.DotNet.ImageBuilder
         public static string NormalizeLineEndings(this string value, string targetFormat)
         {
             string targetLineEnding = targetFormat.GetLineEndingFormat();
-            string valueLineEnding = value.GetLineEndingFormat();
-            if (valueLineEnding != targetLineEnding)
+
+            value = value
+                .Replace("\r\n", "\n")
+                .Replace("\r", "\n");
+
+            if (targetLineEnding == "\r\n")
             {
-                value = value.Replace(valueLineEnding, targetLineEnding);
+                value = value.Replace("\n", targetLineEnding);
             }
 
             // Make sure the value ends with a blank line if the target ends with a blank line
