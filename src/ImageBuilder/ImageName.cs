@@ -74,25 +74,23 @@ public record ImageName
 
         string? tag = null;
         string? digest = null;
-
-        separatorIndex = imageName.IndexOf('@');
-        if (separatorIndex >= 0)
+        int digestSeparatorIndex = imageName.IndexOf('@');
+        if (digestSeparatorIndex >= 0)
         {
-            digest = imageName[(separatorIndex + 1)..];
+            digest = imageName[(digestSeparatorIndex + 1)..];
+            imageName = imageName[..digestSeparatorIndex];
         }
-        else
+
+        int tagSeparatorIndex = imageName.IndexOf(':');
+        if (tagSeparatorIndex >= 0)
         {
-            separatorIndex = imageName.IndexOf(':');
-            if (separatorIndex >= 0)
-            {
-                tag = imageName[(separatorIndex + 1)..];
-            }
+            tag = imageName[(tagSeparatorIndex + 1)..];
         }
 
         string repo;
-        if (separatorIndex >= 0)
+        if (tagSeparatorIndex >= 0)
         {
-            repo = imageName[..separatorIndex];
+            repo = imageName[..tagSeparatorIndex];
         }
         else
         {
