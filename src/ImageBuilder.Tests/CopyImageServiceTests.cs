@@ -174,6 +174,72 @@ public class CopyImageServiceTests
     }
 
     /// <summary>
+    /// Lifecycle metadata referrers represent EOL annotations and should not be copied
+    /// to newly published images. Other referrer types, such as signatures, should still be copied.
+    /// </summary>
+    [Fact]
+    public async Task ImportImageAsync_DoesNotCopyLifecycleReferrers()
+    {
+        PublishConfiguration publishConfig = CreateAcrPublishConfig("myacr.azurecr.io");
+
+        Mock<IAcrImageImporter> mockImporter = new();
+        Mock<IOrasService> mockOras = new();
+        mockOras
+            .Setup(o => o.GetReferrersAsync("myacr.azurecr.io/repo:tag", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<ReferrerInfo>
+            {
+                new("myacr.azurecr.io/repo@sha256:sig1", "application/vnd.cncf.notary.signature"),
+                new("myacr.azurecr.io/repo@sha256:eol1", "application/vnd.microsoft.artifact.lifecycle")
+            });
+
+        CopyImageService service = new(
+            Mock.Of<ILogger<CopyImageService>>(),
+            mockImporter.Object,
+            mockOras.Object,
+            ConfigurationHelper.CreateOptionsMock(publishConfig));
+
+        await service.ImportImageAsync(
+            destTagNames: ["mirror/repo:tag"],
+            destAcrName: "myacr.azurecr.io",
+            srcTagName: "repo:tag",
+            srcRegistryName: "myacr.azurecr.io",
+            isDryRun: false);
+
+        mockImporter.Verify(
+            x => x.ImportImageAsync(
+                "myacr.azurecr.io",
+                It.IsAny<ResourceIdentifier>(),
+                It.Is<ContainerRegistryImportImageContent>(c =>
+                    c.TargetTags.Count == 1 && c.TargetTags[0] == "mirror/repo:tag")),
+            Times.Once);
+
+        mockImporter.Verify(
+            x => x.ImportImageAsync(
+                "myacr.azurecr.io",
+                It.IsAny<ResourceIdentifier>(),
+                It.Is<ContainerRegistryImportImageContent>(c =>
+                    c.UntaggedTargetRepositories.Count == 1
+                    && c.UntaggedTargetRepositories[0] == "mirror/repo"
+                    && c.Source.SourceImage == "repo@sha256:sig1")),
+            Times.Once);
+
+        mockImporter.Verify(
+            x => x.ImportImageAsync(
+                "myacr.azurecr.io",
+                It.IsAny<ResourceIdentifier>(),
+                It.Is<ContainerRegistryImportImageContent>(c =>
+                    c.Source.SourceImage == "repo@sha256:eol1")),
+            Times.Never);
+
+        mockImporter.Verify(
+            x => x.ImportImageAsync(
+                It.IsAny<string>(),
+                It.IsAny<ResourceIdentifier>(),
+                It.IsAny<ContainerRegistryImportImageContent>()),
+            Times.Exactly(2));
+    }
+
+    /// <summary>
     /// When no referrers exist, ImportImageAsync should import only the main image.
     /// </summary>
     [Fact]
