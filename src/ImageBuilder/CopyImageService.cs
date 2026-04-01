@@ -103,7 +103,7 @@ public class CopyImageService : ICopyImageService
         IReadOnlyList<ReferrerInfo> referrers = await _orasService.GetReferrersAsync(sourceImageReference);
 
         string destRepo = destTagNames.First().Split(':')[0].Split('@')[0];
-        foreach (ReferrerInfo referrer in referrers)
+        foreach (ReferrerInfo referrer in referrers.Where(referrer => referrer.ArtifactType != OciArtifactType.Lifecycle))
         {
             _logger.LogInformation("Importing referrer '{Referrer}' to '{DestAcr}/{DestRepo}'", referrer.Digest, destAcrName, destRepo);
 
