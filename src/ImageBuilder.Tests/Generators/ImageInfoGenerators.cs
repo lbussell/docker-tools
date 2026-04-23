@@ -145,10 +145,22 @@ public static class ImageInfoGenerators
         });
 
     /// <summary>
-    /// Generates an <see cref="ImageArtifactDetails"/> with 1-3 repos.
+    /// Generates an <see cref="ImageArtifactDetails"/> with 1-3 repos, each with a unique name.
     /// </summary>
     public static Gen<ImageArtifactDetails> ImageArtifactDetails { get; } =
-        RepoData.List[1, 3]
+        Gen.Shuffle(RepoNames)
+            .SelectMany(shuffled =>
+            {
+                int count = Math.Min(shuffled.Length, 3);
+                return Gen.Int[1, count].SelectMany(repoCount =>
+                    ImageData.List[1, 3].Array[repoCount]
+                        .Select(imageLists =>
+                            imageLists.Select((images, index) => new RepoData
+                            {
+                                Repo = shuffled[index],
+                                Images = images,
+                            }).ToList()));
+            })
             .Select(repos => new ImageArtifactDetails
             {
                 Repos = repos,
