@@ -2,15 +2,16 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System;
 using System.CommandLine;
-using System.CommandLine.Invocation;
+using System.CommandLine.Parsing;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Microsoft.DotNet.ImageBuilder.Commands
 {
-    public abstract class Command<TOptions, TOptionsBuilder> : ICommand
+    public abstract class Command<TOptions> : ICommand
         where TOptions : Options, new()
-        where TOptionsBuilder : CliOptionsBuilder, new()
     {
         public TOptions Options { get; private set; }
 
@@ -25,34 +26,22 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
 
         public Command GetCliCommand()
         {
+            TOptions options = new();
+
             Command cmd = new Command(this.GetCommandName(), Description);
+            cmd.AddOptions(options);
 
-            TOptionsBuilder OptionsBuilder = new TOptionsBuilder();
-
-            foreach (Argument argument in OptionsBuilder.GetCliArguments())
+            cmd.SetAction(async (parseResult, cancellationToken) =>
             {
-                cmd.AddArgument(argument);
-            }
+                options.Bind(parseResult);
 
-            foreach (Option option in OptionsBuilder.GetCliOptions())
-            {
-                cmd.AddOption(option);
-            }
-
-            foreach (var validator in OptionsBuilder.GetValidators())
-            {
-                cmd.AddValidator(validator);
-            }
-
-            cmd.Handler = CommandHandler.Create<TOptions>(options =>
-            {
                 if (!options.NoVersionLogging)
                 {
                     LogDockerVersions();
                 }
 
                 Initialize(options);
-                return ExecuteAsync();
+                await ExecuteAsync();
             });
 
             return cmd;
