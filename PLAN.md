@@ -1,517 +1,167 @@
 # Plan: Refactor ImageArtifactDetails into Stateless Immutable Data Models
 
-## Progress
+## Goal
 
-**Steps 1-10 COMPLETE** ✅ (10 commits on `imageinfo-refactor` branch)
+Move image-info data (`ImageArtifactDetails`, `RepoData`, `ImageData`, `PlatformData`, `ManifestData`, `Layer`) to `ImageBuilder.Models` as stateless, immutable records with no Newtonsoft.Json attributes and no manifest ViewModel references. Move behavior into services/query classes in `ImageBuilder`, then migrate commands and remove the old mutable model classes.
 
-New infrastructure built and verified with 54 property/metamorphic tests:
-- CsCheck generators for all image-info model types
-- Baseline property tests for serialization, merge, and identity behavior
-- V2 immutable records in `ImageBuilder.Models/Image/` (namespace `V2`)
-- `ImageInfoIdentity` — canonical key generation
-- `ImageInfoSerializer` — V2 serialization (proven identical to old)
-- `ManifestLinkIndex` — key-based manifest linking
-- `ImageInfoMerger` — explicit type-safe merge (proven identical to old)
-- `ImageInfoQueryService` — digest/query operations (proven identical to old)
-- `PlatformDataBuilder` — mutable accumulator for BuildCommand
+## Completed Foundation
 
-**Remaining**: Step 10.5 and Steps 11-13 (Re-evaluate Generators/Properties, Migrate Commands, Update Tests, Remove Old Classes)
+The initial infrastructure is in place:
 
-## Problem Statement
+- Added CsCheck to `ImageBuilder.Tests`.
+- Added initial image-info generators and property/differential tests for serialization, merge, identity, linking, query, serializer migration, merger migration, and `PlatformDataBuilder`.
+- Added temporary V2 records in `src/ImageBuilder.Models/Image/` under `Microsoft.DotNet.ImageBuilder.Models.Image.V2`.
+- Added service-layer replacements in `ImageBuilder`:
+  - `ImageInfoIdentity`
+  - `ImageInfoSerializer`
+  - `ManifestLinkIndex`
+  - `ImageInfoMerger`
+  - `ImageInfoQueryService`
+  - `PlatformDataBuilder`
+- Verified the foundation with the current `ImageBuilder.Tests` suite.
 
-`ImageArtifactDetails` and its related image-info model classes (`RepoData`, `ImageData`, `PlatformData`, `ManifestData`, `Layer`) currently live in `src/ImageBuilder/Models/Image/` and are **tightly coupled** to:
+Production commands still use the old mutable image-info classes in `src/ImageBuilder/Models/Image/`. The old classes and namespace remain until command migration is complete.
 
-1. **Newtonsoft.Json** — via `[JsonProperty]`, `[JsonIgnore]`, `[JsonConverter]` attributes and direct `JsonConvert` calls
-2. **Manifest ViewModel types** — `[JsonIgnore]` properties (`ManifestImage`, `ManifestRepo`, `ImageInfo`, `PlatformInfo`) create runtime cross-references to ViewModel objects
-3. **Behavior** — `IComparable` implementations, `GetIdentifier()`, `HasDifferentTagState()`, `FromPlatformInfo()`, `AllTags` computed property, `FromJson()` static factory with schema migration
-4. **Reflection-based merge logic** — `ImageInfoHelper.MergeData()` uses reflection over properties, skipping `[JsonIgnore]`-annotated ones
+## Key Decisions
 
-The goal is to make these models **stateless, immutable records** in the `ImageBuilder.Models` project with **no Newtonsoft.Json dependency**, moving all behavior to services and query/lookup classes in the `ImageBuilder` project.
+### Testing terminology and scope
 
-## Current State
+Old-vs-new comparisons are primarily **differential/characterization property tests**, not strict metamorphic tests. They are useful when the equivalence boundary is externally observable, such as `(manifest, sourceJson, targetJson, options) => mergedJson`.
 
-### Model Classes (all in `src/ImageBuilder/Models/Image/`)
+Use CsCheck's direct metamorphic APIs only where there are genuinely two different operation paths on the same initial state that should converge, such as valid merge-order or normalization invariants. Do not add broad generated tests that are only hardcoded change detectors; every generator and property should have an explicit scenario, contract, and reason to exist.
 
-| Class | Behavior | Newtonsoft Attributes | ViewModel Cross-Refs |
-|---|---|---|---|
-| `ImageArtifactDetails` | `FromJson()` static factory, nested `SchemaVersion2LayerConverter` | None on properties | None |
-| `RepoData` | `IComparable<RepoData>.CompareTo()` | `[JsonProperty(Required)]` on `Repo` | None |
-| `ImageData` | `IComparable<ImageData>.CompareTo()` (requires `ManifestImage`) | `[JsonProperty(NullValueHandling)]` × 2, `[JsonIgnore]` × 2 | `ManifestImage`, `ManifestRepo` |
-| `PlatformData` | `IComparable.CompareTo()`, `GetIdentifier()`, `HasDifferentTagState()`, `FromPlatformInfo()`, `AllTags` | `[JsonProperty(Required)]` × 6, `[JsonProperty(NullValueHandling)]` × 1, `[JsonProperty(DefaultValueHandling)]` × 1, `[JsonIgnore]` × 3 | `ImageInfo`, `PlatformInfo` |
-| `ManifestData` | None ✅ | None ✅ | None ✅ |
-| `Layer` | None ✅ (already a record) | None ✅ | None ✅ |
+### Serializer and schema scope
 
-### Key Behavioral Responsibilities to Extract
+The image-info serialization contract must preserve:
 
-1. **Serialization / Deserialization with schema migration**
-   - `ImageArtifactDetails.FromJson()` + `SchemaVersion2LayerConverter` (v1→v2 Layer migration)
-   - `JsonHelper.SerializeObject()` with `CustomContractResolver` (camelCase, required-property handling, empty-list skipping)
-   - Newtonsoft attributes on model properties control serialization behavior
-
-2. **Deep merge logic** (`ImageInfoHelper.MergeImageArtifactDetails()`)
-   - Reflection-based: iterates properties, checks types, skips `[JsonIgnore]`
-   - Different behavior for build vs publish (`ImageInfoMergeOptions.IsPublish`)
-   - Uses `IComparable<T>` to match source/target items in lists
-   - Special handling for string lists (merge vs replace), Layers (always replace), dictionaries
-
-3. **IComparable implementations** (used by merge to match items)
-   - `RepoData.CompareTo()` — compares by `Repo` name
-   - `ImageData.CompareTo()` — compares by `ManifestImage` reference, then `ProductVersion`, then first platform (**requires ManifestImage to be set**)
-   - `PlatformData.CompareTo()` — compares by tag state + identifier string
-
-4. **PlatformData behavior**
-   - `GetIdentifier()` — `{Dockerfile}-{Architecture}-{OsType}-{OsVersion}[-{MajorMinorVersion}]` (accesses `ImageInfo` for version)
-   - `HasDifferentTagState()` — checks if SimpleTags emptiness differs
-   - `FromPlatformInfo()` — factory creating PlatformData from ViewModel types
-   - `AllTags` — computed property combining `ImageInfo.SharedTags` + `PlatformInfo.Tags`
-
-5. **Manifest linking** (`ImageInfoHelper.LoadFromContent()`)
-   - After deserialization, walks tree and sets `[JsonIgnore]` ViewModel references
-   - Uses `ArePlatformsEqual()` to match platforms to manifest definitions
-   - `ArePlatformsEqual()` creates a temporary `PlatformData` via `FromPlatformInfo()` and compares identifiers
-
-6. **Extension methods on ImageArtifactDetails** (`ImageInfoHelper`)
-   - `GetAllDigests()` — collects all platform + manifest list digests
-   - `GetAllImageDigestInfos()` — collects digest+tags+isManifestList tuples
-   - `ApplyRegistryOverride()` — rewrites digests with registry prefix
-   - `GetMatchingPlatformData()` — finds PlatformData by PlatformInfo reference
-
-### Consumers (Commands)
-
-| Command | Uses |
-|---|---|
-| `BuildCommand` | Creates `ImageArtifactDetails`, populates platform data, serializes to file |
-| `MergeImageInfoCommand` | Loads multiple files, merges, applies commit overrides, removes stale content |
-| `CreateManifestListCommand` | Loads, reads `ManifestImage`/`ManifestRepo`, updates manifest digests |
-| `CopyAcrImagesCommand` | Loads, reads digests and `ManifestImage.SharedTags` |
-| `WaitForMcrImageIngestionCommand` | Loads, reads digests and syndicated tags via `ManifestImage` |
-| `GetStaleImagesCommand` | Loads, uses `GetMatchingPlatformData()`, compares layers/digests |
-| `GenerateBuildMatrixCommand` | Loads, uses `GetMatchingPlatformData()` for cache checking |
-| `TrimUnchangedPlatformsCommand` | Deserializes directly, removes `IsUnchanged` platforms, re-serializes |
-| `SignImagesCommand` | Deserializes, applies registry override, gets all digests |
-| `VerifySignaturesCommand` | Deserializes, applies registry override, gets all image references |
-| `PostPublishNotificationCommand` | Loads, reads tags and digests |
-| `IngestKustoImageInfoCommand` | Loads, iterates repos/images/platforms for Kusto ingestion |
-| `GenerateEolAnnotationDataForPublishCommand` | Deserializes two files, compares old vs new, gets digests |
-| `PublishImageInfoCommand` | Merges into published version |
-
-## Key Design Decisions (Resolved)
-
-### Namespace Coexistence Strategy
-**Decision: Temporary `ImageInfoV2` namespace during migration.**
-
-New record types will live in `Microsoft.DotNet.ImageBuilder.Models.ImageInfoV2` (in the `ImageBuilder.Models` project) while old types remain in `Microsoft.DotNet.ImageBuilder.Models.Image` (in the `ImageBuilder` project). After all consumers are migrated and old types deleted, rename the namespace to the canonical `Microsoft.DotNet.ImageBuilder.Models.Image`. This avoids compiler ambiguity and allows incremental migration.
-
-### Identity Model (Key-Based, Not Object-Based)
-**Decision: Stable identity keys for linking, not object references.**
-
-Instead of keying lookups by record object identity (which breaks with `with` expressions creating new instances), define stable keys:
-- `RepoKey` = repo name (string)
-- `PlatformKey` = `{Dockerfile}-{Architecture}-{OsType}-{OsVersion}-{NormalizedProductVersion}-{TagState}` (the same components as `GetIdentifier()`)
-- `ImageKey` = derived from product version + representative platform key
-
-The `ManifestLinkIndex` and merger both use these keys. This is the **heart of the migration** — getting identity right enables everything else.
-
-### BuildCommand Accumulation Strategy
-**Decision: Mutable builder/accumulator within ImageBuilder, materialized to immutable records.**
-
-`BuildCommand` mutates platform data across multiple passes (digest after push, layers after inspection, etc.). Rather than chaining nested `with` expressions, use a mutable `PlatformDataBuilder` internally that materializes to an immutable `PlatformData` record once all data is collected. Only ImageBuilder uses the builder; all external consumers see immutable records.
-
-### Newtonsoft.Json Removal Scope
-**Decision: Split into image-info records (immediate) and manifest models (deferred).**
-
-New image-info records have zero serialization attributes. Removing `Newtonsoft.Json` from `ImageBuilder.Models.csproj` is **deferred** until the existing Manifest models (`Image.cs`, `Platform.cs`, etc.) are also migrated — that's a separate effort. The image-info records simply don't use any Newtonsoft types, even though the project-level dependency may remain temporarily.
-
-### Schema v1 Layer Migration Is Dead Code
-The `SchemaVersion2LayerConverter` (converts string-based layers to `Layer` records) and the `CanReadJsonSchemaVersion1` test can be **removed** as part of this refactor. All real-world image-info.json files have been fully migrated to schema v2. This simplifies the new serializer — no backward-compatibility converter needed.
-
-### Serialization Contract
-The following serialization behaviors are **contractual** (must be preserved):
 - camelCase property names
-- Required fields (`Repo`, `Dockerfile`, `Digest`, etc.) are always serialized even when default/empty
-- Optional/empty lists are omitted from output
-- `NullValueHandling.Ignore` for optional nullable properties
-- `SchemaVersion` always outputs `"2.0"`
+- required fields always serialized
+- optional empty lists omitted
+- optional null values omitted
+- `schemaVersion` serialized as `"2.0"`
 
-### Property, Differential, and Metamorphic Test Scope
-**Decision: Be precise about the testing technique and only keep properties that prove a meaningful contract.**
+Schema v1 layer migration is considered dead code. `SchemaVersion2LayerConverter` and the `CanReadJsonSchemaVersion1` test can be removed as part of final cleanup.
 
-Old-vs-new comparisons are primarily **differential/characterization property tests**, not strictly metamorphic tests. They are valuable when the equivalence boundary is externally observable (for example, `(manifest, sourceJson, targetJson, options) => mergedJson`) and the generated scenarios are intentionally designed to hit important behavior. Direct CsCheck metamorphic tests should be used when there are genuinely two different operation paths on the same initial state that should converge to the same result, such as valid merge-order or normalization invariants.
+### Namespace and dependency scope
 
-Put most generated coverage on `serializer`, `merger`, `linker`, and `query` services. Command tests focus on wiring/adaptation (existing example-based tests suffice for command logic). Avoid adding broad tests that are only hardcoded change detectors; every generator and property must have an explicit scenario, contract, and reason to exist.
+The temporary V2 namespace avoids collisions while old and new models coexist. After command migration, delete the old model classes and rename `Microsoft.DotNet.ImageBuilder.Models.Image.V2` to the canonical `Microsoft.DotNet.ImageBuilder.Models.Image`.
 
-## Target Architecture
+The image-info records should not depend on Newtonsoft.Json. Removing the Newtonsoft.Json package from `ImageBuilder.Models` is out of scope because existing manifest models still use Newtonsoft attributes.
 
-### Phase 1: Establish Property Testing Infrastructure
+### Identity and manifest linking
 
-Add CsCheck to the test project and create generators for all image-info model types **including linked-state scenarios** (ManifestInfo + ImageArtifactDetails pairs). Write baseline property, differential, and targeted metamorphic tests that capture current serialization, merge, and comparison behavior before making any changes.
+New code should use stable keys instead of mutable object references:
 
-### Phase 2: Design Identity Model and Create New Records
+- repo key: repo name
+- platform key: Dockerfile, architecture, OS type, OS version, and optionally normalized product version
+- image identity: product-version equivalence plus representative platform identity
 
-Define stable identity keys, then create new record types in `ImageBuilder.Models` (under temporary `ImageInfoV2` namespace) that are:
-- Immutable (`init` properties, `IReadOnlyList`)
-- Free of serialization attributes
-- Free of ViewModel cross-references
-- Free of behavior methods
+`ManifestLinkIndex` replaces `[JsonIgnore]` ViewModel references. Old merge behavior often requires manifest-linked state, so old-vs-new merge parity tests for overlapping images/platforms should include the manifest in the test boundary.
 
-### Phase 3: Create Services to Replace Extracted Behavior
+### Mutation points
 
-Create service classes in `ImageBuilder` that operate on the new models:
-- **ImageInfoSerializer** — handles JSON serialization/deserialization with schema migration
-- **ImageInfoIdentity** — canonical key generation, platform matching
-- **ImageInfoMerger** — explicit (non-reflection) merge logic using identity keys
-- **ManifestLinkIndex** — key-based lookup mapping image-info ↔ manifest
-- **ImageInfoQueryService** — `GetAllDigests()`, `GetMatchingPlatform()`, `ApplyRegistryOverride()`, etc.
-- **PlatformDataBuilder** — mutable accumulator for BuildCommand
+Immutable records are the public data model, but some commands still need internal mutation while building results:
 
-### Phase 4: Migrate Commands to Use New Models + Services
+- `BuildCommand` accumulates platform digest, creation time, layers, base digest, and unchanged state. Use `PlatformDataBuilder`.
+- `CreateManifestListCommand` updates manifest digest, shared tags, syndicated digests, and creation time with immutable record replacement.
+- `MergeImageInfoCommand` should use `ImageInfoMerger` instead of mutating target graphs directly.
 
-Update each command to use the new records and services. Example-based tests suffice for command wiring.
+## Remaining Work
 
-### Phase 5: Cleanup
+### Step 1: Audit and Redesign Generators and Property Tests
 
-Remove old mutable classes, rename `ImageInfoV2` → canonical namespace.
-
----
-
-## Implementation Steps (Ordered)
-
-### Step 1: Add CsCheck and Create Generators
-
-**Goal**: Establish property testing infrastructure with generators for all model types, **including linked-state scenarios**.
+**Goal**: Re-evaluate every generator and generated test before command migration. Keep tests that prove meaningful behavior, refactor tests whose boundary is wrong, and remove tests that only act as brittle change detectors.
 
 **Tasks**:
-- Add `CsCheck` NuGet package to `ImageBuilder.Tests` project
-- Create `Gen` (generator) helpers for:
-  - `Layer` (random digest string + size)
-  - `ManifestData` (optional digest, shared tags, syndicated digests, created date)
-  - `PlatformData` (valid dockerfile path, digest, osType, osVersion, architecture, tags, layers, etc.)
-  - `ImageData` (product version, optional manifest, list of platforms)
-  - `RepoData` (repo name, list of images)
-  - `ImageArtifactDetails` (list of repos)
-- Create **linked-state generators** that produce `(ManifestInfo, ImageArtifactDetails)` pairs where the image-info has been through `LoadFromContent` (manifest linking is done)
-- Generators for edge cases: empty lists, single-item collections, repos with removed platforms, publish vs build merge scenarios, shared-tag moves between images
-- Generators should produce realistic data (valid SHA digests, plausible paths, consistent dockerfile/arch/os combinations)
-- Revisit generator design before command migration. Separate broad production-shaped generators from edge-biased and scenario-specific generators so tests do not depend on one generic generator being good at everything.
 
-**Files**:
-- `src/ImageBuilder.Tests/Microsoft.DotNet.ImageBuilder.Tests.csproj` (add CsCheck reference)
-- `src/ImageBuilder.Tests/Generators/ImageInfoGenerators.cs` (new)
-
-### Step 2: Write Baseline Property Tests for Serialization
-
-**Goal**: Lock down current serialization round-trip behavior before any changes.
-
-**Properties**:
-- **Round-trip**: For any `ImageArtifactDetails`, `FromJson(SerializeObject(x))` produces semantically identical output
-- **Deterministic output**: Serializing the same object twice produces identical JSON
-- **Deserialization validation**: Deserialization rejects JSON missing required properties
-
-**Files**:
-- `src/ImageBuilder.Tests/PropertyTests/SerializationPropertyTests.cs` (new)
-
-### Step 3: Write Baseline Property/Differential Tests for Merge Logic
-
-**Goal**: Lock down current merge behavior.
-
-**Properties**:
-- **Identity merge**: Merging `x` into empty target yields `x` equivalent
-- **Idempotency**: Merging `x` into `x` yields `x`
-- **Commutativity of non-overlapping**: Merging non-overlapping repos from `a` and `b` is order-independent
-- **Tag merge vs replace**: Build mode merges tags (union); publish mode replaces tags
-- **Layer replace**: Layers are always replaced, never merged
-- **Sort invariant**: Output repos/images/platforms are always sorted
-- **JSON-boundary equivalence**: For generated merge scenarios, compare old and new behavior through an externally observable boundary. For overlapping image/platform cases, include the manifest in the input shape because old merge semantics require manifest-linked state.
-
-**Note**: Merge tests require linked-state data (ManifestImage must be set for ImageData.CompareTo). Use the linked-state generators from Step 1.
-
-**Files**:
-- `src/ImageBuilder.Tests/PropertyTests/MergePropertyTests.cs` (new)
-
-### Step 4: Write Baseline Tests for Identity and Platform Matching
-
-**Goal**: Lock down `GetIdentifier`, `HasDifferentTagState`, and platform matching — the semantics actually used by merge/linking, not abstract ordering laws.
-
-**Properties to test** (adjusted for actual behavior — `CompareTo` is a match/no-match check, not a total order):
-- **GetIdentifier determinism**: Same inputs always produce same identifier
-- **GetIdentifier component sensitivity**: Changing any component (dockerfile, arch, os, osVersion) changes the identifier
-- **HasDifferentTagState symmetry**: `a.HasDifferentTagState(b) == b.HasDifferentTagState(a)`
-- **Platform match/no-match**: Two platforms from the same manifest entry compare as 0; different entries compare as non-zero
-- **ArePlatformsEqual consistency**: Matches are consistent with GetIdentifier + product version normalization
-- **Deterministic sort output**: Sorting a list of platforms by CompareTo produces deterministic ordering
-
-**Files**:
-- `src/ImageBuilder.Tests/PropertyTests/IdentityPropertyTests.cs` (new)
-
-### Step 5: Design Identity Model and Create New Records
-
-**Goal**: Define stable identity keys and the target immutable data model.
-
-**Part A — Identity Keys**:
-Define canonical key types/functions:
-```csharp
-// Key generation functions (static, pure)
-public static class ImageInfoIdentity
-{
-    public static string GetPlatformKey(string dockerfile, string architecture,
-        string osType, string osVersion, string? productVersion = null) => ...;
-    public static string GetRepoKey(string repoName) => repoName;
-    public static bool HasDifferentTagState(IReadOnlyList<string> tagsA, IReadOnlyList<string> tagsB) => ...;
-    public static bool AreProductVersionsEquivalent(string? v1, string? v2) => ...;
-}
-```
-
-**Part B — Record types** (in `ImageBuilder.Models/Image/`, namespace `Microsoft.DotNet.ImageBuilder.Models.ImageInfoV2`):
-```csharp
-public record ImageArtifactDetails { ... }
-public record RepoData { ... }
-public record ImageData { ... }
-public record PlatformData { ... }
-public record ManifestData { ... }
-public record Layer(string Digest, long Size);
-```
-(Full definitions as in the record types section below, with `init` properties and `IReadOnlyList`)
-
-**Metamorphic test**: For any old PlatformData, `ImageInfoIdentity.GetPlatformKey(...)` produces the same string as the old `GetIdentifier()`.
-
-**Files**:
-- `src/ImageBuilder/Services/ImageInfoIdentity.cs` (new)
-- `src/ImageBuilder.Models/Image/ImageArtifactDetails.cs` (new)
-- `src/ImageBuilder.Models/Image/RepoData.cs` (new)
-- `src/ImageBuilder.Models/Image/ImageData.cs` (new)
-- `src/ImageBuilder.Models/Image/PlatformData.cs` (new)
-- `src/ImageBuilder.Models/Image/ManifestData.cs` (new)
-- `src/ImageBuilder.Models/Image/Layer.cs` (new)
-- `src/ImageBuilder.Tests/PropertyTests/IdentityMigrationPropertyTests.cs` (new)
-
-### Step 6: Create ImageInfoSerializer Service
-
-**Goal**: Centralize serialization/deserialization with schema migration.
-
-**Responsibilities**:
-- Deserialize JSON to new `ImageArtifactDetails` records
-- Serialize new `ImageArtifactDetails` to JSON preserving current formatting rules
-- Can use Newtonsoft.Json internally (dependency stays in ImageBuilder, not Models)
-- **No schema v1 migration needed** — `SchemaVersion2LayerConverter` is dead code and will be removed
-
-**Metamorphic test**: For any `ImageArtifactDetails` generated by CsCheck, `NewSerializer.Deserialize(OldSerializer.Serialize(x))` produces equivalent output, and vice versa.
-
-**Files**:
-- `src/ImageBuilder/Services/ImageInfoSerializer.cs` (new)
-- `src/ImageBuilder.Tests/PropertyTests/SerializerMigrationPropertyTests.cs` (new)
-
-### Step 7: Create ManifestLinkIndex (Key-Based)
-
-**Goal**: Replace mutable `[JsonIgnore]` ViewModel references with a key-based lookup structure that survives `with`-based record updates.
-
-**Design**: Uses identity keys from Step 5, not object references.
-
-```csharp
-public class ManifestLinkIndex
-{
-    // Build from image-info + manifest
-    public static ManifestLinkIndex Create(ImageArtifactDetails details, ManifestInfo manifest);
-
-    // Key-based lookups
-    public ImageInfo? GetManifestImage(string platformKey);
-    public RepoInfo? GetManifestRepo(string repoKey);
-    public PlatformInfo? GetPlatformInfo(string platformKey);
-}
-```
-
-**Metamorphic test**: For any image-info loaded with manifest, key-based lookups return the same objects as the old `[JsonIgnore]` properties.
-
-**Files**:
-- `src/ImageBuilder/Services/ManifestLinkIndex.cs` (new)
-- `src/ImageBuilder.Tests/PropertyTests/ManifestLinkingPropertyTests.cs` (new)
-
-### Step 8: Create Explicit (Non-Reflection) Merge Logic
-
-**Goal**: Replace the reflection-based `MergeData()` with explicit, type-safe merge logic using identity keys.
-
-**Design**: The new merger operates on immutable records and returns new instances.
-
-```csharp
-public class ImageInfoMerger
-{
-    public ImageArtifactDetails Merge(
-        ImageArtifactDetails source,
-        ImageArtifactDetails target,
-        ImageInfoMergeOptions options);
-}
-```
-
-Uses `ImageInfoIdentity` keys to match source/target items (instead of `IComparable`). Does not require manifest linking.
-
-**Metamorphic test**: For any two `ImageArtifactDetails` objects and merge options, `NewMerger.Merge(a, b, opts)` serializes identically to the result of old merge logic.
-
-**Files**:
-- `src/ImageBuilder/Services/ImageInfoMerger.cs` (new)
-- `src/ImageBuilder.Tests/PropertyTests/MergeMigrationPropertyTests.cs` (new)
-
-### Step 9: Create ImageInfoQueryService
-
-**Goal**: Centralize query/lookup operations currently scattered as extension methods.
-
-**Methods**:
-- `GetAllDigests(ImageArtifactDetails)` → `List<string>`
-- `GetAllImageDigestInfos(ImageArtifactDetails)` → `List<ImageDigestInfo>`
-- `ApplyRegistryOverride(ImageArtifactDetails, RegistryOptions)` → `ImageArtifactDetails` (returns new instance)
-- `GetMatchingPlatformData(string platformKey, string repoKey, ImageArtifactDetails)` → `(PlatformData, ImageData)?`
-
-**Metamorphic test**: For any ImageArtifactDetails, new query methods return same results as old extension methods.
-
-**Files**:
-- `src/ImageBuilder/Services/ImageInfoQueryService.cs` (new)
-- `src/ImageBuilder.Tests/PropertyTests/QueryMigrationPropertyTests.cs` (new)
-
-### Step 10: Create PlatformDataBuilder
-
-**Goal**: Provide a mutable accumulator for `BuildCommand` that materializes to immutable records.
-
-**Design**:
-```csharp
-public class PlatformDataBuilder
-{
-    // Set fields incrementally (as BuildCommand does today)
-    public PlatformDataBuilder SetDigest(string digest);
-    public PlatformDataBuilder SetCreated(DateTime created);
-    public PlatformDataBuilder SetLayers(IReadOnlyList<Layer> layers);
-    public PlatformDataBuilder SetBaseImageDigest(string? digest);
-    public PlatformDataBuilder SetIsUnchanged(bool isUnchanged);
-
-    // Materialize to immutable record
-    public PlatformData Build();
-}
-```
-
-**Files**:
-- `src/ImageBuilder/Services/PlatformDataBuilder.cs` (new)
-
-### Step 10.5: Re-evaluate Generators and Property Tests
-
-**Goal**: Pause before command migration to ensure the generated tests are scenario-driven, valuable, and not just broad change detectors.
-
-**Tasks**:
-- Audit every generator and every property test. For each one, decide whether to keep, refactor, or remove it based on the behavior it proves.
-- Label each property by intent: invariant, round-trip, differential/characterization, model-based, or true metamorphic. Use CsCheck's `SampleMetamorphic` only when two distinct operation paths on the same initial state should converge.
-- Split generator families by purpose:
-  - **Production-shaped generators** for broad serialization and query coverage.
-  - **Edge-biased generators** for empty repos/images/platforms, null optional fields in old models, empty vs non-empty lists, duplicate values, unsorted values, weird-but-valid tags, identity collisions, and empty platform lists.
-  - **Linked manifest/image-info generators** for old behavior that requires `ManifestInfo`, `ManifestImage`, `ManifestRepo`, `ImageInfo`, and `PlatformInfo` references.
+- Audit each generator and property test. For each one, record whether it is an invariant, round-trip, differential/characterization, model-based, or true metamorphic test.
+- Replace misleading "metamorphic" terminology where the test is really differential old-vs-new parity.
+- Convert hand-picked version identity cases into generated properties where they prove a general rule. Keep hand-picked cases only when they document named, intentional behavior.
+- Add or refactor generator families by purpose:
+  - **Production-shaped generators** for broad serialization/query coverage.
+  - **Edge-biased generators** for empty repos/images/platforms, null optional old-model fields, empty vs non-empty lists, duplicate values, unsorted values, weird-but-valid tags, identity collisions, and empty platform lists.
+  - **Linked manifest/image-info generators** for old behavior requiring `ManifestInfo`, `ManifestImage`, `ManifestRepo`, `ImageInfo`, and `PlatformInfo` references.
   - **Merge scenario generators** that generate `(manifest, sourceJson, targetJson, options)` or equivalent structured inputs targeted at one merge semantic at a time.
-- Bias merge scenarios toward the behavior that is easy to miss:
-  - Empty source/target lists and empty-platform images.
-  - Non-overlapping repos/images/platforms.
-  - Overlapping repo + image + platform where scalar source values replace target values.
-  - Source `ManifestData` null clearing target manifest data, and source manifest data replacing/merging target manifest data.
-  - Build-mode string list union/sort vs publish-mode replace/sort for replaceable lists.
-  - Empty source string lists leaving target lists unchanged in build mode.
-  - Layer replacement preserving source layer order.
-  - Platform tag-state mismatch preventing a platform match even when structural identity matches.
-  - Product-version major/minor equivalence controlling image/platform matching.
-  - First-platform-based image identity, including empty-platform images and platform order changes.
-  - Shared-tag moves between images, especially in publish mode.
-- Fix the `ImageInfoMerger.CompareFirstPlatforms` empty-platform comparer bug red/green before relying on the merger in further command migration.
-- Convert hand-picked version identity tests into generated properties where they prove a general rule; keep hand-picked examples only when they document intentionally important named cases.
+- Fix `ImageInfoMerger.CompareFirstPlatforms` for empty-platform images using red-green TDD before relying on the merger for command migration.
+
+**Merge scenarios to bias toward**:
+
+- Empty source and target lists.
+- Images with empty platform lists.
+- Non-overlapping repos, images, and platforms.
+- Overlapping repo + image + platform where scalar source values replace target values.
+- Source `ManifestData` null clearing target manifest data.
+- Source manifest data replacing or merging target manifest data.
+- Build-mode string list union/sort vs publish-mode replace/sort for replaceable lists.
+- Empty source string lists leaving target lists unchanged in build mode.
+- Layer replacement preserving source layer order.
+- Platform tag-state mismatch preventing a platform match even when structural identity matches.
+- Product-version major/minor equivalence controlling image/platform matching.
+- First-platform-based image identity, including empty-platform images and platform order changes.
+- Shared-tag moves between images, especially in publish mode.
 
 **Files**:
+
 - `src/ImageBuilder.Tests/Generators/ImageInfoGenerators.cs`
 - `src/ImageBuilder.Tests/PropertyTests/*.cs`
 - `src/ImageBuilder/Services/ImageInfoMerger.cs`
 
-### Step 11: Migrate Commands (One by One)
+### Step 2: Migrate Commands
 
-**Goal**: Update each command to use new records + services after Step 10.5 has clarified and hardened the generated test suite. Order by dependency (least coupled first).
+**Goal**: Update production commands to use the new records and services after the generator/property audit is complete.
 
 **Migration order**:
-1. `TrimUnchangedPlatformsCommand` — simplest, just deserializes/filters/reserializes
-2. `SignImagesCommand` — deserialize + registry override + get digests
-3. `VerifySignaturesCommand` — similar to SignImages
-4. `GenerateEolAnnotationDataForPublishCommand` — deserialize + compare + get digests
-5. `PullImagesCommand` — load + iterate
-6. `IngestKustoImageInfoCommand` — load + iterate
-7. `PostPublishNotificationCommand` — load + read tags/digests
-8. `GetStaleImagesCommand` — load + platform matching via ManifestLinkIndex
-9. `GenerateBuildMatrixCommand` — load + platform matching
-10. `CopyAcrImagesCommand` — load + ManifestLinkIndex for shared tags
-11. `WaitForMcrImageIngestionCommand` — load + ManifestLinkIndex
-12. `CreateManifestListCommand` — load + ManifestLinkIndex + produce updated records
-13. `MergeImageInfoCommand` — uses merge logic extensively
-14. `BuildCommand` — uses PlatformDataBuilder to create ImageArtifactDetails from scratch
 
-**Testing**: Existing example-based command tests are sufficient for command wiring once the service-level property/differential coverage has been audited and hardened.
+1. `TrimUnchangedPlatformsCommand` - deserialize, filter, serialize.
+2. `SignImagesCommand` - deserialize, apply registry override, get digests.
+3. `VerifySignaturesCommand` - deserialize, apply registry override, get image references.
+4. `GenerateEolAnnotationDataForPublishCommand` - deserialize, compare old/new, get digests.
+5. `PullImagesCommand` - load and iterate.
+6. `IngestKustoImageInfoCommand` - load and iterate for Kusto ingestion.
+7. `PostPublishNotificationCommand` - load and read tags/digests.
+8. `GetStaleImagesCommand` - load and match platforms via `ManifestLinkIndex`.
+9. `GenerateBuildMatrixCommand` - load and match platforms for cache checking.
+10. `CopyAcrImagesCommand` - load and use `ManifestLinkIndex` for shared tags.
+11. `WaitForMcrImageIngestionCommand` - load and use `ManifestLinkIndex`.
+12. `CreateManifestListCommand` - load, use `ManifestLinkIndex`, and produce updated immutable records.
+13. `MergeImageInfoCommand` - use `ImageInfoMerger` for merge behavior.
+14. `BuildCommand` - use `PlatformDataBuilder` to create immutable image-info output.
 
-### Step 12: Update Test Infrastructure
+Existing command tests should cover command wiring. Service-level property/differential tests should cover core serializer, merge, linking, query, and identity behavior.
 
-**Goal**: Update test helpers and existing tests to use new record types.
+### Step 3: Update Test Infrastructure
 
-**Tasks**:
-- Update `ImageInfoHelper` test helper to create new record types
-- Update `SerializationHelper` to work with new records
-- Update all existing unit tests to reference new types
-- Ensure all existing tests still pass
-
-### Step 13: Remove Old Classes and Rename Namespace
-
-**Goal**: Delete the old mutable classes and finalize namespaces.
+**Goal**: Move test helpers and existing unit tests onto the new record types once production commands no longer depend on the old mutable classes.
 
 **Tasks**:
-- Remove old classes from `src/ImageBuilder/Models/Image/`
-- Remove `[JsonIgnore]` ViewModel properties (replaced by `ManifestLinkIndex`)
-- Rename `Microsoft.DotNet.ImageBuilder.Models.ImageInfoV2` → `Microsoft.DotNet.ImageBuilder.Models.Image`
-- Clean up unused Newtonsoft.Json imports
-- Verify all tests pass
 
-### Step 14 (Future): Remove Newtonsoft.Json from ImageBuilder.Models
+- Update image-info test helpers to create V2/new record types directly.
+- Consolidate repeated old-to-V2 conversion helpers or remove them if JSON-boundary tests replace them.
+- Update serialization helpers to work with new records.
+- Update existing unit tests to reference new types.
+- Ensure the full test suite passes after each major test-infrastructure change.
 
-**Goal**: Deferred — separate effort to migrate Manifest models away from Newtonsoft.Json.
+### Step 4: Remove Old Classes and Finalize Namespace
 
-This step is **out of scope** for the image-info refactor. It requires migrating the Manifest model serialization in `ImageBuilder.Models/Manifest/*.cs` which is a distinct concern. The Newtonsoft.Json PackageReference will remain in `ImageBuilder.Models.csproj` until that work is done.
+**Goal**: Delete old mutable image-info classes and make the new records the canonical model.
 
----
+**Tasks**:
 
-## Key Risks and Considerations
+- Remove old classes from `src/ImageBuilder/Models/Image/`.
+- Remove `[JsonIgnore]` ViewModel properties and behavior methods from the image-info model surface.
+- Remove schema v1 migration code and obsolete tests.
+- Rename `Microsoft.DotNet.ImageBuilder.Models.Image.V2` to `Microsoft.DotNet.ImageBuilder.Models.Image`.
+- Clean up unused Newtonsoft.Json imports tied to image-info models.
+- Verify the full test suite passes.
 
-### IComparable Is Not a Total Order
-`PlatformData.CompareTo` returns `1` when tag states differ — it's a match/no-match check, not a proper total ordering. Property tests must test the semantics actually used (matching, deterministic sort output) rather than generic ordering laws like transitivity.
+### Future: Remove Newtonsoft.Json from ImageBuilder.Models
 
-### Merge Requires Linked State (Currently)
-`ImageData.CompareTo()` throws `InvalidOperationException` if `ManifestImage` is null. The current merge only works after manifest linking. The new explicit merger avoids this by using identity keys instead of `IComparable`, enabling merge without manifest linking.
+This is out of scope for the image-info refactor. Existing manifest models in `ImageBuilder.Models/Manifest/*.cs` still use Newtonsoft.Json attributes, so removing the package requires a separate manifest-model serialization migration.
 
-### Immutability and Mutation Points
-Several commands mutate image-info objects after creation:
-- `BuildCommand` sets `Digest`, `Created`, `Layers`, `BaseImageDigest`, `IsUnchanged` on `PlatformData` across multiple passes
-- `CreateManifestListCommand` sets `ManifestData.Digest`, `SharedTags`, `SyndicatedDigests`, `Created`
-- `MergeImageInfoCommand` mutates the target during merge
+## Risks and Considerations
 
-The `PlatformDataBuilder` (Step 10) addresses BuildCommand. Other commands will use `with` expressions on immutable records.
-
-### Newtonsoft.Json in Manifest Models (Out of Scope)
-The existing Manifest models in `ImageBuilder.Models/Manifest/` use Newtonsoft.Json attributes (`[JsonProperty]`, `[JsonConverter(typeof(StringEnumConverter))]`). Migrating those is a separate effort. The Newtonsoft.Json PackageReference stays in `ImageBuilder.Models.csproj` for now — only the new image-info records are attribute-free.
-
-### Test Coverage Gap
-Current tests are all example-based. Property tests will dramatically increase coverage of edge cases (empty lists, null values, single-item collections, very large structures, etc.).
-
-## Dependencies Between Steps
-
-```
-Step 1 (CsCheck + Generators)
-├── Step 2 (Serialization baseline tests)
-├── Step 3 (Merge baseline tests)  [needs linked-state generators]
-└── Step 4 (Identity baseline tests)
-    │
-Step 5 (Identity model + New records) ← independent of baseline tests
-    │
-Step 6 (ImageInfoSerializer) ← depends on Step 5, Step 2
-Step 7 (ManifestLinkIndex) ← depends on Step 5
-Step 8 (Explicit Merger) ← depends on Step 5, Step 7, Step 3
-Step 9 (QueryService) ← depends on Step 5, Step 7
-Step 10 (PlatformDataBuilder) ← depends on Step 5
-Step 10.5 (Re-evaluate Generators and Property Tests) ← depends on Steps 1-10
-    │
-Step 11 (Migrate Commands) ← depends on Steps 6-10.5
-Step 12 (Update Tests) ← depends on Step 11
-Step 13 (Remove Old Classes + Rename NS) ← depends on Steps 11-12
-Step 14 (Remove Newtonsoft from Models) ← FUTURE, out of scope
-```
+- Old `PlatformData.CompareTo` is not a lawful total order; it returns `1` for tag-state mismatch and behaves more like a match/no-match predicate in merge code.
+- Old `ImageData.CompareTo` can throw when `ManifestImage` is not linked, so old-vs-new overlapping merge parity needs linked manifest state.
+- The new `ImageInfoMerger.CompareFirstPlatforms` currently needs an empty-platform-image fix before further migration depends on it.
+- Immutable data records are safe as outputs, but commands that accumulate data over time need explicit builders or carefully scoped record replacement.
+- Keep generated tests scenario-driven. More generated tests are not automatically better if they do not exercise meaningful contracts.
