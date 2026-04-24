@@ -15,7 +15,7 @@ New infrastructure built and verified with 54 property/metamorphic tests:
 - `ImageInfoQueryService` — digest/query operations (proven identical to old)
 - `PlatformDataBuilder` — mutable accumulator for BuildCommand
 
-**Remaining**: Steps 11-13 (Migrate Commands, Update Tests, Remove Old Classes)
+**Remaining**: Step 10.5 and Steps 11-13 (Re-evaluate Generators/Properties, Migrate Commands, Update Tests, Remove Old Classes)
 
 ## Problem Statement
 
@@ -133,16 +133,18 @@ The following serialization behaviors are **contractual** (must be preserved):
 - `NullValueHandling.Ignore` for optional nullable properties
 - `SchemaVersion` always outputs `"2.0"`
 
-### Metamorphic Test Scope
-**Decision: Focus metamorphic coverage at the service layer, not per-command.**
+### Property, Differential, and Metamorphic Test Scope
+**Decision: Be precise about the testing technique and only keep properties that prove a meaningful contract.**
 
-Put most CsCheck coverage on `serializer`, `merger`, `linker`, and `query` services. Command tests focus on wiring/adaptation (existing example-based tests suffice for command logic). This avoids scope explosion.
+Old-vs-new comparisons are primarily **differential/characterization property tests**, not strictly metamorphic tests. They are valuable when the equivalence boundary is externally observable (for example, `(manifest, sourceJson, targetJson, options) => mergedJson`) and the generated scenarios are intentionally designed to hit important behavior. Direct CsCheck metamorphic tests should be used when there are genuinely two different operation paths on the same initial state that should converge to the same result, such as valid merge-order or normalization invariants.
+
+Put most generated coverage on `serializer`, `merger`, `linker`, and `query` services. Command tests focus on wiring/adaptation (existing example-based tests suffice for command logic). Avoid adding broad tests that are only hardcoded change detectors; every generator and property must have an explicit scenario, contract, and reason to exist.
 
 ## Target Architecture
 
 ### Phase 1: Establish Property Testing Infrastructure
 
-Add CsCheck to the test project and create generators for all image-info model types **including linked-state scenarios** (ManifestInfo + ImageArtifactDetails pairs). Write baseline metamorphic tests that capture current serialization, merge, and comparison behavior before making any changes.
+Add CsCheck to the test project and create generators for all image-info model types **including linked-state scenarios** (ManifestInfo + ImageArtifactDetails pairs). Write baseline property, differential, and targeted metamorphic tests that capture current serialization, merge, and comparison behavior before making any changes.
 
 ### Phase 2: Design Identity Model and Create New Records
 
@@ -190,16 +192,17 @@ Remove old mutable classes, rename `ImageInfoV2` → canonical namespace.
 - Create **linked-state generators** that produce `(ManifestInfo, ImageArtifactDetails)` pairs where the image-info has been through `LoadFromContent` (manifest linking is done)
 - Generators for edge cases: empty lists, single-item collections, repos with removed platforms, publish vs build merge scenarios, shared-tag moves between images
 - Generators should produce realistic data (valid SHA digests, plausible paths, consistent dockerfile/arch/os combinations)
+- Revisit generator design before command migration. Separate broad production-shaped generators from edge-biased and scenario-specific generators so tests do not depend on one generic generator being good at everything.
 
 **Files**:
 - `src/ImageBuilder.Tests/Microsoft.DotNet.ImageBuilder.Tests.csproj` (add CsCheck reference)
 - `src/ImageBuilder.Tests/Generators/ImageInfoGenerators.cs` (new)
 
-### Step 2: Write Baseline Metamorphic Tests for Serialization
+### Step 2: Write Baseline Property Tests for Serialization
 
 **Goal**: Lock down current serialization round-trip behavior before any changes.
 
-**Metamorphic Properties**:
+**Properties**:
 - **Round-trip**: For any `ImageArtifactDetails`, `FromJson(SerializeObject(x))` produces semantically identical output
 - **Deterministic output**: Serializing the same object twice produces identical JSON
 - **Deserialization validation**: Deserialization rejects JSON missing required properties
@@ -207,17 +210,18 @@ Remove old mutable classes, rename `ImageInfoV2` → canonical namespace.
 **Files**:
 - `src/ImageBuilder.Tests/PropertyTests/SerializationPropertyTests.cs` (new)
 
-### Step 3: Write Baseline Metamorphic Tests for Merge Logic
+### Step 3: Write Baseline Property/Differential Tests for Merge Logic
 
 **Goal**: Lock down current merge behavior.
 
-**Metamorphic Properties**:
+**Properties**:
 - **Identity merge**: Merging `x` into empty target yields `x` equivalent
 - **Idempotency**: Merging `x` into `x` yields `x`
 - **Commutativity of non-overlapping**: Merging non-overlapping repos from `a` and `b` is order-independent
 - **Tag merge vs replace**: Build mode merges tags (union); publish mode replaces tags
 - **Layer replace**: Layers are always replaced, never merged
 - **Sort invariant**: Output repos/images/platforms are always sorted
+- **JSON-boundary equivalence**: For generated merge scenarios, compare old and new behavior through an externally observable boundary. For overlapping image/platform cases, include the manifest in the input shape because old merge semantics require manifest-linked state.
 
 **Note**: Merge tests require linked-state data (ManifestImage must be set for ImageData.CompareTo). Use the linked-state generators from Step 1.
 
@@ -384,9 +388,41 @@ public class PlatformDataBuilder
 **Files**:
 - `src/ImageBuilder/Services/PlatformDataBuilder.cs` (new)
 
+### Step 10.5: Re-evaluate Generators and Property Tests
+
+**Goal**: Pause before command migration to ensure the generated tests are scenario-driven, valuable, and not just broad change detectors.
+
+**Tasks**:
+- Audit every generator and every property test. For each one, decide whether to keep, refactor, or remove it based on the behavior it proves.
+- Label each property by intent: invariant, round-trip, differential/characterization, model-based, or true metamorphic. Use CsCheck's `SampleMetamorphic` only when two distinct operation paths on the same initial state should converge.
+- Split generator families by purpose:
+  - **Production-shaped generators** for broad serialization and query coverage.
+  - **Edge-biased generators** for empty repos/images/platforms, null optional fields in old models, empty vs non-empty lists, duplicate values, unsorted values, weird-but-valid tags, identity collisions, and empty platform lists.
+  - **Linked manifest/image-info generators** for old behavior that requires `ManifestInfo`, `ManifestImage`, `ManifestRepo`, `ImageInfo`, and `PlatformInfo` references.
+  - **Merge scenario generators** that generate `(manifest, sourceJson, targetJson, options)` or equivalent structured inputs targeted at one merge semantic at a time.
+- Bias merge scenarios toward the behavior that is easy to miss:
+  - Empty source/target lists and empty-platform images.
+  - Non-overlapping repos/images/platforms.
+  - Overlapping repo + image + platform where scalar source values replace target values.
+  - Source `ManifestData` null clearing target manifest data, and source manifest data replacing/merging target manifest data.
+  - Build-mode string list union/sort vs publish-mode replace/sort for replaceable lists.
+  - Empty source string lists leaving target lists unchanged in build mode.
+  - Layer replacement preserving source layer order.
+  - Platform tag-state mismatch preventing a platform match even when structural identity matches.
+  - Product-version major/minor equivalence controlling image/platform matching.
+  - First-platform-based image identity, including empty-platform images and platform order changes.
+  - Shared-tag moves between images, especially in publish mode.
+- Fix the `ImageInfoMerger.CompareFirstPlatforms` empty-platform comparer bug red/green before relying on the merger in further command migration.
+- Convert hand-picked version identity tests into generated properties where they prove a general rule; keep hand-picked examples only when they document intentionally important named cases.
+
+**Files**:
+- `src/ImageBuilder.Tests/Generators/ImageInfoGenerators.cs`
+- `src/ImageBuilder.Tests/PropertyTests/*.cs`
+- `src/ImageBuilder/Services/ImageInfoMerger.cs`
+
 ### Step 11: Migrate Commands (One by One)
 
-**Goal**: Update each command to use new records + services. Order by dependency (least coupled first).
+**Goal**: Update each command to use new records + services after Step 10.5 has clarified and hardened the generated test suite. Order by dependency (least coupled first).
 
 **Migration order**:
 1. `TrimUnchangedPlatformsCommand` — simplest, just deserializes/filters/reserializes
@@ -404,7 +440,7 @@ public class PlatformDataBuilder
 13. `MergeImageInfoCommand` — uses merge logic extensively
 14. `BuildCommand` — uses PlatformDataBuilder to create ImageArtifactDetails from scratch
 
-**Testing**: Existing example-based command tests are sufficient. Metamorphic coverage is at the service layer.
+**Testing**: Existing example-based command tests are sufficient for command wiring once the service-level property/differential coverage has been audited and hardened.
 
 ### Step 12: Update Test Infrastructure
 
@@ -472,8 +508,9 @@ Step 7 (ManifestLinkIndex) ← depends on Step 5
 Step 8 (Explicit Merger) ← depends on Step 5, Step 7, Step 3
 Step 9 (QueryService) ← depends on Step 5, Step 7
 Step 10 (PlatformDataBuilder) ← depends on Step 5
+Step 10.5 (Re-evaluate Generators and Property Tests) ← depends on Steps 1-10
     │
-Step 11 (Migrate Commands) ← depends on Steps 6-10
+Step 11 (Migrate Commands) ← depends on Steps 6-10.5
 Step 12 (Update Tests) ← depends on Step 11
 Step 13 (Remove Old Classes + Rename NS) ← depends on Steps 11-12
 Step 14 (Remove Newtonsoft from Models) ← FUTURE, out of scope
