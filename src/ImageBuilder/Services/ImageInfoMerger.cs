@@ -211,28 +211,45 @@ public static class ImageInfoMerger
     }
 
     private static V2.ImageData? FindMatchingImage(V2.ImageData source, List<V2.ImageData> targets) =>
-        targets.FirstOrDefault(target => CompareImages(source, target) == 0);
+        targets.FirstOrDefault(target => AreImagesEquivalent(source, target));
 
     private static V2.PlatformData? FindMatchingPlatform(V2.PlatformData source, List<V2.PlatformData> targets) =>
         targets.FirstOrDefault(target => ComparePlatforms(source, target) == 0);
 
     /// <summary>
-    /// Compares images for matching. Two images match if they have equivalent product versions
-    /// and (when versions match) the same first platform identity.
+    /// Determines whether two images represent the same logical image and should be merged.
+    /// This mirrors the old <c>ManifestImage</c> object-identity matching: within a repo,
+    /// images are identified by product version. Different build legs for the same image
+    /// have different architectures but the same product version.
     /// </summary>
-    private static int CompareImages(V2.ImageData a, V2.ImageData b)
+    /// <remarks>
+    /// <list type="bullet">
+    ///   <item>Both empty-platform: exact version match required (no platform identity available).</item>
+    ///   <item>One empty, one populated: never equivalent (different structural kinds).</item>
+    ///   <item>Both populated: major.minor product-version equivalence is sufficient.</item>
+    /// </list>
+    /// </remarks>
+    private static bool AreImagesEquivalent(V2.ImageData a, V2.ImageData b)
     {
         if (a.Platforms.Count == 0 && b.Platforms.Count == 0)
         {
-            return string.Compare(a.ProductVersion, b.ProductVersion, StringComparison.Ordinal);
+            return a.ProductVersion == b.ProductVersion;
         }
 
-        if (ImageInfoIdentity.AreProductVersionsEquivalent(a.ProductVersion, b.ProductVersion) &&
-            HaveSameFirstPlatformKey(a, b))
+        if (a.Platforms.Count == 0 || b.Platforms.Count == 0)
         {
-            return 0;
+            return false;
         }
 
+        return ImageInfoIdentity.AreProductVersionsEquivalent(a.ProductVersion, b.ProductVersion);
+    }
+
+    /// <summary>
+    /// Compares images for deterministic sort ordering.
+    /// Primary sort key is product version (ordinal), secondary is first platform identity.
+    /// </summary>
+    private static int CompareImages(V2.ImageData a, V2.ImageData b)
+    {
         int versionCompare = string.Compare(a.ProductVersion, b.ProductVersion, StringComparison.Ordinal);
         if (versionCompare != 0)
         {
@@ -242,18 +259,6 @@ public static class ImageInfoMerger
         return CompareFirstPlatforms(a, b);
     }
 
-    private static bool HaveSameFirstPlatformKey(V2.ImageData a, V2.ImageData b)
-    {
-        V2.PlatformData? firstA = a.Platforms.OrderBy(p => p, Comparer<V2.PlatformData>.Create(ComparePlatforms)).FirstOrDefault();
-        V2.PlatformData? firstB = b.Platforms.OrderBy(p => p, Comparer<V2.PlatformData>.Create(ComparePlatforms)).FirstOrDefault();
-
-        if (firstA is null || firstB is null)
-        {
-            return firstA is null && firstB is null;
-        }
-
-        return ComparePlatforms(firstA, firstB) == 0;
-    }
 
     private static int CompareFirstPlatforms(V2.ImageData a, V2.ImageData b)
     {
