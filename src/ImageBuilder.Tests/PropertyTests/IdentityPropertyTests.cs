@@ -10,6 +10,7 @@ using Microsoft.DotNet.ImageBuilder.Models.Image;
 using Microsoft.DotNet.ImageBuilder.Tests.Generators;
 using Shouldly;
 using Xunit;
+using V2 = Microsoft.DotNet.ImageBuilder.Models.Image.V2;
 
 namespace Microsoft.DotNet.ImageBuilder.Tests.PropertyTests;
 
@@ -27,8 +28,9 @@ public class IdentityPropertyTests
     {
         ImageInfoGenerators.PlatformData.Sample(platform =>
         {
-            string id1 = platform.GetIdentifier();
-            string id2 = platform.GetIdentifier();
+            PlatformData oldPlatform = platform.ConvertToV1();
+            string id1 = oldPlatform.GetIdentifier();
+            string id2 = oldPlatform.GetIdentifier();
             id2.ShouldBe(id1);
         });
     }
@@ -42,12 +44,13 @@ public class IdentityPropertyTests
     {
         ImageInfoGenerators.PlatformData.Sample(platform =>
         {
-            string identifier = platform.GetIdentifier();
+            PlatformData oldPlatform = platform.ConvertToV1();
+            string identifier = oldPlatform.GetIdentifier();
 
-            identifier.ShouldContain(platform.Dockerfile);
-            identifier.ShouldContain(platform.Architecture);
-            identifier.ShouldContain(platform.OsType);
-            identifier.ShouldContain(platform.OsVersion);
+            identifier.ShouldContain(oldPlatform.Dockerfile);
+            identifier.ShouldContain(oldPlatform.Architecture);
+            identifier.ShouldContain(oldPlatform.OsType);
+            identifier.ShouldContain(oldPlatform.OsVersion);
         });
     }
 
@@ -59,10 +62,11 @@ public class IdentityPropertyTests
     {
         ImageInfoGenerators.PlatformData.Sample(platform =>
         {
-            string original = platform.GetIdentifier();
+            PlatformData oldPlatform = platform.ConvertToV1();
+            string original = oldPlatform.GetIdentifier();
 
-            platform.Dockerfile = platform.Dockerfile + "/modified";
-            string modified = platform.GetIdentifier();
+            oldPlatform.Dockerfile = oldPlatform.Dockerfile + "/modified";
+            string modified = oldPlatform.GetIdentifier();
 
             modified.ShouldNotBe(original);
         });
@@ -76,11 +80,12 @@ public class IdentityPropertyTests
     {
         ImageInfoGenerators.PlatformData.Sample(platform =>
         {
-            string original = platform.GetIdentifier();
+            PlatformData oldPlatform = platform.ConvertToV1();
+            string original = oldPlatform.GetIdentifier();
 
-            string newArch = platform.Architecture == "amd64" ? "arm64" : "amd64";
-            platform.Architecture = newArch;
-            string modified = platform.GetIdentifier();
+            string newArch = oldPlatform.Architecture == "amd64" ? "arm64" : "amd64";
+            oldPlatform.Architecture = newArch;
+            string modified = oldPlatform.GetIdentifier();
 
             modified.ShouldNotBe(original);
         });
@@ -97,8 +102,10 @@ public class IdentityPropertyTests
             ImageInfoGenerators.PlatformData)
         .Sample((platformA, platformB) =>
         {
-            bool abResult = platformA.HasDifferentTagState(platformB);
-            bool baResult = platformB.HasDifferentTagState(platformA);
+            PlatformData oldPlatformA = platformA.ConvertToV1();
+            PlatformData oldPlatformB = platformB.ConvertToV1();
+            bool abResult = oldPlatformA.HasDifferentTagState(oldPlatformB);
+            bool baResult = oldPlatformB.HasDifferentTagState(oldPlatformA);
             baResult.ShouldBe(abResult);
         });
     }
@@ -116,7 +123,9 @@ public class IdentityPropertyTests
             platformA.SimpleTags.Count > 0 && platformB.SimpleTags.Count > 0)
         .Sample((platformA, platformB) =>
         {
-            platformA.HasDifferentTagState(platformB).ShouldBeFalse();
+            PlatformData oldPlatformA = platformA.ConvertToV1();
+            PlatformData oldPlatformB = platformB.ConvertToV1();
+            oldPlatformA.HasDifferentTagState(oldPlatformB).ShouldBeFalse();
         });
     }
 
@@ -130,18 +139,19 @@ public class IdentityPropertyTests
             .Where(platform => platform.SimpleTags.Count > 0)
             .Sample(platform =>
         {
+            PlatformData oldPlatform = platform.ConvertToV1();
             PlatformData emptyTagPlatform = new()
             {
-                Dockerfile = platform.Dockerfile,
-                Architecture = platform.Architecture,
-                OsType = platform.OsType,
-                OsVersion = platform.OsVersion,
-                Digest = platform.Digest,
-                CommitUrl = platform.CommitUrl,
+                Dockerfile = oldPlatform.Dockerfile,
+                Architecture = oldPlatform.Architecture,
+                OsType = oldPlatform.OsType,
+                OsVersion = oldPlatform.OsVersion,
+                Digest = oldPlatform.Digest,
+                CommitUrl = oldPlatform.CommitUrl,
                 SimpleTags = [],
             };
 
-            platform.HasDifferentTagState(emptyTagPlatform).ShouldBeTrue();
+            oldPlatform.HasDifferentTagState(emptyTagPlatform).ShouldBeTrue();
         });
     }
 
@@ -157,7 +167,7 @@ public class IdentityPropertyTests
         .Sample((repoA, repoB) =>
         {
             int expected = string.Compare(repoA.Repo, repoB.Repo, StringComparison.Ordinal);
-            int actual = repoA.CompareTo(repoB);
+            int actual = repoA.ConvertToV1().CompareTo(repoB.ConvertToV1());
 
             // Same sign
             Math.Sign(actual).ShouldBe(Math.Sign(expected));
@@ -173,19 +183,20 @@ public class IdentityPropertyTests
     {
         ImageInfoGenerators.PlatformData.Sample(platform =>
         {
+            PlatformData oldPlatform = platform.ConvertToV1();
             PlatformData clone = new()
             {
-                Dockerfile = platform.Dockerfile,
-                Architecture = platform.Architecture,
-                OsType = platform.OsType,
-                OsVersion = platform.OsVersion,
+                Dockerfile = oldPlatform.Dockerfile,
+                Architecture = oldPlatform.Architecture,
+                OsType = oldPlatform.OsType,
+                OsVersion = oldPlatform.OsVersion,
                 Digest = "different-digest",
                 CommitUrl = "different-commit",
-                SimpleTags = platform.SimpleTags.Count > 0 ? ["different-tag"] : [],
+                SimpleTags = oldPlatform.SimpleTags.Count > 0 ? ["different-tag"] : [],
             };
 
             // Same structural identity → CompareTo == 0
-            platform.CompareTo(clone).ShouldBe(0);
+            oldPlatform.CompareTo(clone).ShouldBe(0);
         });
     }
 
@@ -198,8 +209,9 @@ public class IdentityPropertyTests
     {
         ImageInfoGenerators.PlatformData.List[2, 5].Sample(platforms =>
         {
-            List<PlatformData> sorted1 = [.. platforms.OrderBy(platform => platform)];
-            List<PlatformData> sorted2 = [.. platforms.OrderBy(platform => platform)];
+            List<PlatformData> oldPlatforms = platforms.Select(platform => platform.ConvertToV1()).ToList();
+            List<PlatformData> sorted1 = [.. oldPlatforms.OrderBy(platform => platform)];
+            List<PlatformData> sorted2 = [.. oldPlatforms.OrderBy(platform => platform)];
 
             List<string> ids1 = sorted1.Select(platform => platform.GetIdentifier()).ToList();
             List<string> ids2 = sorted2.Select(platform => platform.GetIdentifier()).ToList();
@@ -215,11 +227,13 @@ public class IdentityPropertyTests
     {
         ImageInfoGenerators.PlatformData.Sample(platform =>
         {
-            string withVersion = platform.GetIdentifier(excludeProductVersion: false);
-            string withoutVersion = platform.GetIdentifier(excludeProductVersion: true);
+            PlatformData oldPlatform = platform.ConvertToV1();
+            string withVersion = oldPlatform.GetIdentifier(excludeProductVersion: false);
+            string withoutVersion = oldPlatform.GetIdentifier(excludeProductVersion: true);
 
             // Without version should be a prefix of with version (or equal if no version available)
             withVersion.ShouldStartWith(withoutVersion);
         });
     }
+
 }

@@ -4,10 +4,11 @@
 
 using System;
 using CsCheck;
-using Microsoft.DotNet.ImageBuilder.Models.Image;
+using Microsoft.DotNet.ImageBuilder.Services;
 using Microsoft.DotNet.ImageBuilder.Tests.Generators;
 using Shouldly;
 using Xunit;
+using V2 = Microsoft.DotNet.ImageBuilder.Models.Image.V2;
 
 namespace Microsoft.DotNet.ImageBuilder.Tests.PropertyTests;
 
@@ -26,9 +27,9 @@ public class SerializationPropertyTests
     {
         ImageInfoGenerators.ImageArtifactDetails.Sample(original =>
         {
-            string json = JsonHelper.SerializeObject(original);
-            ImageArtifactDetails deserialized = ImageArtifactDetails.FromJson(json);
-            string roundTrippedJson = JsonHelper.SerializeObject(deserialized);
+            string json = ImageInfoSerializer.Serialize(original);
+            V2.ImageArtifactDetails deserialized = ImageInfoSerializer.Deserialize(json);
+            string roundTrippedJson = ImageInfoSerializer.Serialize(deserialized);
 
             roundTrippedJson.ShouldBe(json);
         });
@@ -42,8 +43,8 @@ public class SerializationPropertyTests
     {
         ImageInfoGenerators.ImageArtifactDetails.Sample(details =>
         {
-            string json1 = JsonHelper.SerializeObject(details);
-            string json2 = JsonHelper.SerializeObject(details);
+            string json1 = ImageInfoSerializer.Serialize(details);
+            string json2 = ImageInfoSerializer.Serialize(details);
 
             json2.ShouldBe(json1);
         });
@@ -57,7 +58,7 @@ public class SerializationPropertyTests
     {
         ImageInfoGenerators.ImageArtifactDetails.Sample(details =>
         {
-            string json = JsonHelper.SerializeObject(details);
+            string json = ImageInfoSerializer.Serialize(details);
             json.ShouldContain("\"schemaVersion\": \"2.0\"");
         });
     }
@@ -71,7 +72,7 @@ public class SerializationPropertyTests
     {
         ImageInfoGenerators.PlatformData.Sample(platform =>
         {
-            string json = JsonHelper.SerializeObject(platform);
+            string json = SerializePlatform(platform);
 
             json.ShouldContain("\"dockerfile\":");
             json.ShouldContain("\"digest\":");
@@ -88,7 +89,7 @@ public class SerializationPropertyTests
     [Fact]
     public void Serialization_NullOptionalFieldsAreOmitted()
     {
-        PlatformData platform = new()
+        V2.PlatformData platform = new()
         {
             Dockerfile = "src/Dockerfile",
             Digest = "dotnet/runtime@sha256:abc123",
@@ -99,7 +100,7 @@ public class SerializationPropertyTests
             BaseImageDigest = null,
         };
 
-        string json = JsonHelper.SerializeObject(platform);
+        string json = SerializePlatform(platform);
         json.ShouldNotContain("\"baseImageDigest\":");
     }
 
@@ -109,7 +110,7 @@ public class SerializationPropertyTests
     [Fact]
     public void Serialization_EmptyListsAreOmitted()
     {
-        PlatformData platform = new()
+        V2.PlatformData platform = new()
         {
             Dockerfile = "src/Dockerfile",
             Digest = "dotnet/runtime@sha256:abc123",
@@ -121,7 +122,7 @@ public class SerializationPropertyTests
             Layers = [],
         };
 
-        string json = JsonHelper.SerializeObject(platform);
+        string json = SerializePlatform(platform);
         json.ShouldNotContain("\"simpleTags\":");
         json.ShouldNotContain("\"layers\":");
     }
@@ -134,7 +135,7 @@ public class SerializationPropertyTests
     {
         ImageInfoGenerators.ImageArtifactDetails.Sample(details =>
         {
-            string json = JsonHelper.SerializeObject(details);
+            string json = ImageInfoSerializer.Serialize(details);
 
             // camelCase properties should be present
             json.ShouldContain("\"schemaVersion\":");
@@ -152,7 +153,7 @@ public class SerializationPropertyTests
     [Fact]
     public void Serialization_IsUnchangedFalse_IsOmitted()
     {
-        PlatformData platform = new()
+        V2.PlatformData platform = new()
         {
             Dockerfile = "src/Dockerfile",
             Digest = "dotnet/runtime@sha256:abc123",
@@ -163,7 +164,7 @@ public class SerializationPropertyTests
             IsUnchanged = false,
         };
 
-        string json = JsonHelper.SerializeObject(platform);
+        string json = SerializePlatform(platform);
         json.ShouldNotContain("\"isUnchanged\":");
     }
 
@@ -173,7 +174,7 @@ public class SerializationPropertyTests
     [Fact]
     public void Serialization_IsUnchangedTrue_IsIncluded()
     {
-        PlatformData platform = new()
+        V2.PlatformData platform = new()
         {
             Dockerfile = "src/Dockerfile",
             Digest = "dotnet/runtime@sha256:abc123",
@@ -184,7 +185,26 @@ public class SerializationPropertyTests
             IsUnchanged = true,
         };
 
-        string json = JsonHelper.SerializeObject(platform);
+        string json = SerializePlatform(platform);
         json.ShouldContain("\"isUnchanged\": true");
     }
+
+    private static string SerializePlatform(V2.PlatformData platform) =>
+        ImageInfoSerializer.Serialize(new V2.ImageArtifactDetails
+        {
+            Repos =
+            [
+                new V2.RepoData
+                {
+                    Repo = "repo",
+                    Images =
+                    [
+                        new V2.ImageData
+                        {
+                            Platforms = [platform],
+                        }
+                    ],
+                }
+            ],
+        });
 }

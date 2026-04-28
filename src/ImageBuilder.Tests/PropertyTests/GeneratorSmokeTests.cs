@@ -3,10 +3,10 @@
 // See the LICENSE file in the project root for more information.
 
 using CsCheck;
-using Microsoft.DotNet.ImageBuilder.Models.Image;
 using Microsoft.DotNet.ImageBuilder.Tests.Generators;
 using Shouldly;
 using Xunit;
+using V2 = Microsoft.DotNet.ImageBuilder.Models.Image.V2;
 
 namespace Microsoft.DotNet.ImageBuilder.Tests.PropertyTests;
 
@@ -24,16 +24,16 @@ public class GeneratorSmokeTests
             details.Repos.ShouldNotBeEmpty();
             details.SchemaVersion.ShouldBe("2.0");
 
-            foreach (RepoData repo in details.Repos)
+            foreach (V2.RepoData repo in details.Repos)
             {
                 repo.Repo.ShouldNotBeNullOrWhiteSpace();
                 repo.Images.ShouldNotBeEmpty();
 
-                foreach (ImageData image in repo.Images)
+                foreach (V2.ImageData image in repo.Images)
                 {
                     image.Platforms.ShouldNotBeEmpty();
 
-                    foreach (PlatformData platform in image.Platforms)
+                    foreach (V2.PlatformData platform in image.Platforms)
                     {
                         platform.Dockerfile.ShouldNotBeNullOrWhiteSpace();
                         platform.Digest.ShouldNotBeNullOrWhiteSpace();
@@ -75,4 +75,5 @@ public class GeneratorSmokeTests
             }
         }, iter: 500);
     }
+
 }

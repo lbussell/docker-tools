@@ -222,6 +222,11 @@ public static class ImageInfoMerger
     /// </summary>
     private static int CompareImages(V2.ImageData a, V2.ImageData b)
     {
+        if (a.Platforms.Count == 0 && b.Platforms.Count == 0)
+        {
+            return string.Compare(a.ProductVersion, b.ProductVersion, StringComparison.Ordinal);
+        }
+
         if (ImageInfoIdentity.AreProductVersionsEquivalent(a.ProductVersion, b.ProductVersion) &&
             HaveSameFirstPlatformKey(a, b))
         {
@@ -257,7 +262,7 @@ public static class ImageInfoMerger
 
         if (firstA is null)
         {
-            return firstB is null ? 0 : 1;
+            return firstB is null ? 0 : -1;
         }
 
         return firstB is null ? 1 : ComparePlatforms(firstA, firstB);

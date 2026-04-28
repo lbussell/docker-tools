@@ -13,6 +13,7 @@ using Microsoft.DotNet.ImageBuilder.ViewModel;
 using Moq;
 using Shouldly;
 using Xunit;
+using V2 = Microsoft.DotNet.ImageBuilder.Models.Image.V2;
 
 namespace Microsoft.DotNet.ImageBuilder.Tests.PropertyTests;
 
@@ -32,8 +33,9 @@ public class MergePropertyTests
     {
         ImageInfoGenerators.ImageArtifactDetails.Sample(source =>
         {
+            ImageArtifactDetails oldSource = source.ConvertToV1();
             ImageArtifactDetails target1 = new();
-            ImageInfoHelper.MergeImageArtifactDetails(source, target1);
+            ImageInfoHelper.MergeImageArtifactDetails(oldSource, target1);
             string firstMergeJson = JsonHelper.SerializeObject(target1);
 
             ImageArtifactDetails target1Clone = CloneViaJson(target1);
@@ -53,7 +55,7 @@ public class MergePropertyTests
     {
         ImageInfoGenerators.ImageArtifactDetails.Sample(original =>
         {
-            ImageArtifactDetails target = CloneViaJson(original);
+            ImageArtifactDetails target = original.ConvertToV1();
             string beforeJson = JsonHelper.SerializeObject(target);
 
             ImageInfoHelper.MergeImageArtifactDetails(new ImageArtifactDetails(), target);
@@ -73,26 +75,21 @@ public class MergePropertyTests
         Gen.Select(
             ImageInfoGenerators.ImageArtifactDetails,
             ImageInfoGenerators.ImageArtifactDetails)
-        .Sample((detailsA, detailsB) =>
+        .Sample((generatedA, generatedB) =>
         {
-            // Ensure repos don't overlap by prefixing names
-            foreach (RepoData repo in detailsA.Repos)
-            {
-                repo.Repo = $"a/{repo.Repo}";
-            }
-            foreach (RepoData repo in detailsB.Repos)
-            {
-                repo.Repo = $"b/{repo.Repo}";
-            }
+            V2.ImageArtifactDetails detailsA = PrefixRepos(generatedA, "a/");
+            V2.ImageArtifactDetails detailsB = PrefixRepos(generatedB, "b/");
 
             // Clone before merge since merge mutates
-            ImageArtifactDetails detailsAClone = CloneViaJson(detailsA);
-            ImageArtifactDetails detailsBClone = CloneViaJson(detailsB);
+            ImageArtifactDetails oldDetailsA = detailsA.ConvertToV1();
+            ImageArtifactDetails oldDetailsB = detailsB.ConvertToV1();
+            ImageArtifactDetails detailsAClone = CloneViaJson(oldDetailsA);
+            ImageArtifactDetails detailsBClone = CloneViaJson(oldDetailsB);
 
             // Merge A then B
             ImageArtifactDetails targetAB = new();
-            ImageInfoHelper.MergeImageArtifactDetails(detailsA, targetAB);
-            ImageInfoHelper.MergeImageArtifactDetails(detailsB, targetAB);
+            ImageInfoHelper.MergeImageArtifactDetails(oldDetailsA, targetAB);
+            ImageInfoHelper.MergeImageArtifactDetails(oldDetailsB, targetAB);
 
             // Merge B then A
             ImageArtifactDetails targetBA = new();
@@ -114,7 +111,7 @@ public class MergePropertyTests
         ImageInfoGenerators.ImageArtifactDetails.Sample(source =>
         {
             ImageArtifactDetails target = new();
-            ImageInfoHelper.MergeImageArtifactDetails(source, target);
+            ImageInfoHelper.MergeImageArtifactDetails(source.ConvertToV1(), target);
 
             List<string> repoNames = target.Repos.Select(repo => repo.Repo).ToList();
             List<string> sortedNames = [.. repoNames.OrderBy(name => name)];
@@ -282,4 +279,13 @@ public class MergePropertyTests
         string json = JsonHelper.SerializeObject(original);
         return ImageArtifactDetails.FromJson(json);
     }
+
+    private static V2.ImageArtifactDetails PrefixRepos(V2.ImageArtifactDetails details, string prefix) =>
+        details with
+        {
+            Repos = details.Repos.Select(repo => repo with
+            {
+                Repo = $"{prefix}{repo.Repo}",
+            }).ToList(),
+        };
 }

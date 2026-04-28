@@ -6,13 +6,14 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using CsCheck;
-using Microsoft.DotNet.ImageBuilder.Models.Image;
+using V2 = Microsoft.DotNet.ImageBuilder.Models.Image.V2;
 
 namespace Microsoft.DotNet.ImageBuilder.Tests.Generators;
 
 /// <summary>
 /// CsCheck generators for image-info model types.
-/// Produces realistic data suitable for property-based and metamorphic testing.
+/// Production-shaped generators model common image-info output, while edge-biased
+/// generators intentionally include empty collections and optional values.
 /// </summary>
 public static class ImageInfoGenerators
 {
@@ -25,6 +26,36 @@ public static class ImageInfoGenerators
 
     private static readonly Gen<char> HexChar =
         Gen.OneOfConst('0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f');
+
+    /// <summary>
+    /// Generates a known product version used by image-info test data.
+    /// </summary>
+    public static Gen<string> ProductVersion { get; } =
+        Gen.OneOfConst(ProductVersions);
+
+    /// <summary>
+    /// Generates product-version pairs that share the same major.minor identity.
+    /// </summary>
+    public static Gen<(string Version1, string Version2)> SameMajorMinorProductVersionPair { get; } =
+        Gen.Select(
+            Gen.Int[1, 12],
+            Gen.Int[0, 20],
+            Gen.Int[0, 50],
+            Gen.Int[0, 50])
+        .Select((major, minor, patch1, patch2) =>
+            ($"{major}.{minor}.{patch1}", $"{major}.{minor}.{patch2}"));
+
+    /// <summary>
+    /// Generates product-version pairs with different major.minor identities.
+    /// </summary>
+    public static Gen<(string Version1, string Version2)> DifferentMajorMinorProductVersionPair { get; } =
+        Gen.Select(
+            Gen.Int[1, 12],
+            Gen.Int[0, 20],
+            Gen.Int[0, 50],
+            Gen.Int[0, 50])
+        .Select((major, minor, patch1, patch2) =>
+            ($"{major}.{minor}.{patch1}", $"{major + 1}.{minor}.{patch2}"));
 
     /// <summary>
     /// Generates a valid SHA-256 digest string in the format "sha256:{64 hex chars}".
@@ -47,27 +78,38 @@ public static class ImageInfoGenerators
     /// </summary>
     public static Gen<string> SimpleTag { get; } =
         Gen.Select(
-            Gen.OneOfConst(ProductVersions),
+            ProductVersion,
             Gen.OneOfConst(LinuxOsVersions.Concat(WindowsOsVersions).ToArray()),
             Gen.OneOfConst(Architectures),
             (version, os, arch) => $"{version}-{os}-{arch}");
 
     /// <summary>
-    /// Generates a <see cref="Layer"/> with a realistic digest and non-negative size.
+    /// Generates replaceable string-list merge scenarios for build and publish merge modes.
     /// </summary>
-    public static Gen<Layer> Layer { get; } =
-        Gen.Select(DigestHash, Gen.Long[0, 500_000_000], (digest, size) => new Layer(digest, size));
+    public static Gen<(IReadOnlyList<string> Source, IReadOnlyList<string> Target, bool IsPublish)> MergeStringListScenario { get; } =
+        Gen.Select(
+            SimpleTag.List[0, 4],
+            SimpleTag.List[0, 4],
+            Gen.Bool)
+        .Select((source, target, isPublish) =>
+            ((IReadOnlyList<string>)source, (IReadOnlyList<string>)target, isPublish));
 
     /// <summary>
-    /// Generates a <see cref="ManifestData"/> with optional shared tags and digest.
+    /// Generates a <see cref="V2.Layer"/> with a realistic digest and non-negative size.
     /// </summary>
-    public static Gen<ManifestData> ManifestData { get; } =
+    public static Gen<V2.Layer> Layer { get; } =
+        Gen.Select(DigestHash, Gen.Long[0, 500_000_000], (digest, size) => new V2.Layer(digest, size));
+
+    /// <summary>
+    /// Generates a <see cref="V2.ManifestData"/> with optional shared tags and digest.
+    /// </summary>
+    public static Gen<V2.ManifestData> ManifestData { get; } =
         Gen.Select(
             FullDigest,
             Gen.DateTime,
             SimpleTag.List[0, 4],
             FullDigest.List[0, 2])
-        .Select((digest, created, sharedTags, syndicatedDigests) => new ManifestData
+        .Select((digest, created, sharedTags, syndicatedDigests) => new V2.ManifestData
         {
             Digest = digest,
             Created = created,
@@ -76,13 +118,13 @@ public static class ImageInfoGenerators
         });
 
     /// <summary>
-    /// Generates a <see cref="PlatformData"/> with consistent os/arch/dockerfile values.
+    /// Generates a <see cref="V2.PlatformData"/> with consistent os/arch/dockerfile values.
     /// </summary>
-    public static Gen<PlatformData> PlatformData { get; } =
+    public static Gen<V2.PlatformData> PlatformData { get; } =
         Gen.Select(
             Gen.OneOfConst(Architectures),
             Gen.Bool,
-            Gen.OneOfConst(ProductVersions))
+            ProductVersion)
         .SelectMany((architecture, isWindows, version) =>
         {
             string osType = isWindows ? "Windows" : "Linux";
@@ -100,7 +142,7 @@ public static class ImageInfoGenerators
                     "https://github.com/dotnet/dotnet-docker/commit/def456",
                     "https://github.com/dotnet/dotnet-docker/commit/789abc"))
             .Select((osVersion, digest, baseImageDigest, created, tags, layers, isUnchanged, commitUrl) =>
-                new PlatformData
+                new V2.PlatformData
                 {
                     Dockerfile = $"src/{version}/{osVersion}/{architecture}/Dockerfile",
                     SimpleTags = tags,
@@ -117,14 +159,14 @@ public static class ImageInfoGenerators
         });
 
     /// <summary>
-    /// Generates an <see cref="ImageData"/> with a product version and 1-3 platforms.
+    /// Generates a <see cref="V2.ImageData"/> with a product version and 1-3 platforms.
     /// </summary>
-    public static Gen<ImageData> ImageData { get; } =
+    public static Gen<V2.ImageData> ImageData { get; } =
         Gen.Select(
-            Gen.OneOfConst(ProductVersions).Null(),
+            ProductVersion.Null(),
             ManifestData.Null(),
             PlatformData.List[1, 3])
-        .Select((version, manifest, platforms) => new ImageData
+        .Select((version, manifest, platforms) => new V2.ImageData
         {
             ProductVersion = version,
             Manifest = manifest,
@@ -132,22 +174,22 @@ public static class ImageInfoGenerators
         });
 
     /// <summary>
-    /// Generates a <see cref="RepoData"/> with a realistic repo name and 1-3 images.
+    /// Generates a <see cref="V2.RepoData"/> with a realistic repo name and 1-3 images.
     /// </summary>
-    public static Gen<RepoData> RepoData { get; } =
+    public static Gen<V2.RepoData> RepoData { get; } =
         Gen.Select(
             Gen.OneOfConst(RepoNames),
             ImageData.List[1, 3])
-        .Select((repo, images) => new RepoData
+        .Select((repo, images) => new V2.RepoData
         {
             Repo = repo,
             Images = images,
         });
 
     /// <summary>
-    /// Generates an <see cref="ImageArtifactDetails"/> with 1-3 repos, each with a unique name.
+    /// Generates a <see cref="V2.ImageArtifactDetails"/> with 1-3 repos, each with a unique name.
     /// </summary>
-    public static Gen<ImageArtifactDetails> ImageArtifactDetails { get; } =
+    public static Gen<V2.ImageArtifactDetails> ImageArtifactDetails { get; } =
         Gen.Shuffle(RepoNames)
             .SelectMany(shuffled =>
             {
@@ -155,14 +197,15 @@ public static class ImageInfoGenerators
                 return Gen.Int[1, count].SelectMany(repoCount =>
                     ImageData.List[1, 3].Array[repoCount]
                         .Select(imageLists =>
-                            imageLists.Select((images, index) => new RepoData
+                            imageLists.Select((images, index) => new V2.RepoData
                             {
                                 Repo = shuffled[index],
                                 Images = images,
                             }).ToList()));
             })
-            .Select(repos => new ImageArtifactDetails
+            .Select(repos => new V2.ImageArtifactDetails
             {
                 Repos = repos,
             });
+
 }

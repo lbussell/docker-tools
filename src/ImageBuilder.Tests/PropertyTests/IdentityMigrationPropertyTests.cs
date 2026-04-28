@@ -9,11 +9,12 @@ using Microsoft.DotNet.ImageBuilder.Services;
 using Microsoft.DotNet.ImageBuilder.Tests.Generators;
 using Shouldly;
 using Xunit;
+using V2 = Microsoft.DotNet.ImageBuilder.Models.Image.V2;
 
 namespace Microsoft.DotNet.ImageBuilder.Tests.PropertyTests;
 
 /// <summary>
-/// Metamorphic tests verifying that the new <see cref="ImageInfoIdentity"/> functions
+/// Differential characterization tests verifying that the new <see cref="ImageInfoIdentity"/> functions
 /// produce results equivalent to the old <see cref="PlatformData"/> instance methods.
 /// </summary>
 public class IdentityMigrationPropertyTests
@@ -26,15 +27,16 @@ public class IdentityMigrationPropertyTests
     [Fact]
     public void GetPlatformKey_MatchesOldGetIdentifier_ExcludingVersion()
     {
-        ImageInfoGenerators.PlatformData.Sample(oldPlatform =>
+        ImageInfoGenerators.PlatformData.Sample(platform =>
         {
-            string oldIdentifier = oldPlatform.GetIdentifier(excludeProductVersion: true);
+            PlatformData oldModelPlatform = platform.ConvertToV1();
+            string oldIdentifier = oldModelPlatform.GetIdentifier(excludeProductVersion: true);
 
             string newKey = ImageInfoIdentity.GetPlatformKey(
-                oldPlatform.Dockerfile,
-                oldPlatform.Architecture,
-                oldPlatform.OsType,
-                oldPlatform.OsVersion);
+                platform.Dockerfile,
+                platform.Architecture,
+                platform.OsType,
+                platform.OsVersion);
 
             newKey.ShouldBe(oldIdentifier);
         });
@@ -50,16 +52,16 @@ public class IdentityMigrationPropertyTests
         Gen.Select(
             ImageInfoGenerators.PlatformData,
             Gen.OneOfConst("8.0", "8.0.15", "9.0", "9.0.5", "10.0", "10.0.0-preview.1"))
-        .Sample((oldPlatform, version) =>
+        .Sample((platform, version) =>
         {
             string? expectedMajorMinor = ImageInfoIdentity.GetMajorMinorVersion(version);
-            string expected = $"{oldPlatform.Dockerfile}-{oldPlatform.Architecture}-{oldPlatform.OsType}-{oldPlatform.OsVersion}-{expectedMajorMinor}";
+            string expected = $"{platform.Dockerfile}-{platform.Architecture}-{platform.OsType}-{platform.OsVersion}-{expectedMajorMinor}";
 
             string actual = ImageInfoIdentity.GetPlatformKey(
-                oldPlatform.Dockerfile,
-                oldPlatform.Architecture,
-                oldPlatform.OsType,
-                oldPlatform.OsVersion,
+                platform.Dockerfile,
+                platform.Architecture,
+                platform.OsType,
+                platform.OsVersion,
                 version);
 
             actual.ShouldBe(expected);
@@ -77,36 +79,63 @@ public class IdentityMigrationPropertyTests
             ImageInfoGenerators.PlatformData)
         .Sample((platformA, platformB) =>
         {
-            bool oldResult = platformA.HasDifferentTagState(platformB);
+            bool oldResult = platformA.ConvertToV1().HasDifferentTagState(platformB.ConvertToV1());
             bool newResult = ImageInfoIdentity.HasDifferentTagState(platformA.SimpleTags, platformB.SimpleTags);
             newResult.ShouldBe(oldResult);
         });
     }
 
     /// <summary>
-    /// ImageInfoIdentity.AreProductVersionsEquivalent matches the old private
-    /// AreProductVersionsEquivalent behavior. Both consider versions with matching
-    /// major.minor segments as equivalent.
+    /// Identical product versions are equivalent.
     /// </summary>
     [Fact]
-    public void AreProductVersionsEquivalent_MatchesKnownCases()
+    public void AreProductVersionsEquivalent_IdenticalVersions_ReturnsTrue()
     {
-        // Identical versions
-        ImageInfoIdentity.AreProductVersionsEquivalent("8.0", "8.0").ShouldBeTrue();
-        ImageInfoIdentity.AreProductVersionsEquivalent("9.0.5", "9.0.5").ShouldBeTrue();
+        ImageInfoGenerators.ProductVersion.Sample(version =>
+        {
+            ImageInfoIdentity.AreProductVersionsEquivalent(version, version).ShouldBeTrue();
+        });
+    }
 
-        // Same major.minor, different patch
-        ImageInfoIdentity.AreProductVersionsEquivalent("8.0", "8.0.15").ShouldBeTrue();
-        ImageInfoIdentity.AreProductVersionsEquivalent("9.0.5", "9.0.10").ShouldBeTrue();
+    /// <summary>
+    /// Product versions with the same major.minor segments are equivalent.
+    /// </summary>
+    [Fact]
+    public void AreProductVersionsEquivalent_SameMajorMinor_ReturnsTrue()
+    {
+        ImageInfoGenerators.SameMajorMinorProductVersionPair.Sample(pair =>
+        {
+            ImageInfoIdentity.AreProductVersionsEquivalent(pair.Version1, pair.Version2).ShouldBeTrue();
+        });
+    }
 
-        // Different major.minor
-        ImageInfoIdentity.AreProductVersionsEquivalent("8.0", "9.0").ShouldBeFalse();
-        ImageInfoIdentity.AreProductVersionsEquivalent("8.0.15", "9.0.5").ShouldBeFalse();
+    /// <summary>
+    /// Product versions with different major.minor segments are not equivalent.
+    /// </summary>
+    [Fact]
+    public void AreProductVersionsEquivalent_DifferentMajorMinor_ReturnsFalse()
+    {
+        ImageInfoGenerators.DifferentMajorMinorProductVersionPair.Sample(pair =>
+        {
+            ImageInfoIdentity.AreProductVersionsEquivalent(pair.Version1, pair.Version2).ShouldBeFalse();
+        });
+    }
 
-        // Preview suffix stripped
+    /// <summary>
+    /// Preview suffixes are stripped before product-version equivalence is evaluated.
+    /// </summary>
+    [Fact]
+    public void AreProductVersionsEquivalent_StripsPreviewSuffix()
+    {
         ImageInfoIdentity.AreProductVersionsEquivalent("10.0.0-preview.1", "10.0").ShouldBeTrue();
+    }
 
-        // Null handling
+    /// <summary>
+    /// Null product versions match only another null product version.
+    /// </summary>
+    [Fact]
+    public void AreProductVersionsEquivalent_NullHandling()
+    {
         ImageInfoIdentity.AreProductVersionsEquivalent(null, null).ShouldBeTrue();
         ImageInfoIdentity.AreProductVersionsEquivalent("8.0", null).ShouldBeFalse();
         ImageInfoIdentity.AreProductVersionsEquivalent(null, "8.0").ShouldBeFalse();
@@ -124,4 +153,5 @@ public class IdentityMigrationPropertyTests
         ImageInfoIdentity.GetMajorMinorVersion(null).ShouldBeNull();
         ImageInfoIdentity.GetMajorMinorVersion("").ShouldBeNull();
     }
+
 }

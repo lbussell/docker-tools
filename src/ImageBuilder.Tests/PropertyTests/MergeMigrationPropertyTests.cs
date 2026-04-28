@@ -2,27 +2,34 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using CsCheck;
 using Microsoft.DotNet.ImageBuilder.Models.Image;
+using Microsoft.DotNet.ImageBuilder.Models.Manifest;
 using Microsoft.DotNet.ImageBuilder.Services;
 using Microsoft.DotNet.ImageBuilder.Tests.Generators;
+using Microsoft.DotNet.ImageBuilder.Tests.Helpers;
+using Microsoft.DotNet.ImageBuilder.ViewModel;
 using Shouldly;
 using Xunit;
 using V2 = Microsoft.DotNet.ImageBuilder.Models.Image.V2;
+using static Microsoft.DotNet.ImageBuilder.Tests.Helpers.DockerfileHelper;
+using static Microsoft.DotNet.ImageBuilder.Tests.Helpers.ManifestHelper;
 
 namespace Microsoft.DotNet.ImageBuilder.Tests.PropertyTests;
 
 /// <summary>
-/// Metamorphic tests verifying that the new <see cref="ImageInfoMerger"/>
+/// Differential characterization tests verifying that the new <see cref="ImageInfoMerger"/>
 /// produces results equivalent to the old <see cref="ImageInfoHelper.MergeImageArtifactDetails"/>.
 /// </summary>
 public class MergeMigrationPropertyTests
 {
     /// <summary>
     /// Merging non-overlapping repos with the new merger produces the same JSON
-    /// as the old merger (after converting between old and V2 types).
+    /// as the old merger when both paths start from the same JSON input.
     /// </summary>
     [Fact]
     public void Merge_NonOverlappingRepos_MatchesOldBehavior()
@@ -30,32 +37,21 @@ public class MergeMigrationPropertyTests
         Gen.Select(
             ImageInfoGenerators.ImageArtifactDetails,
             ImageInfoGenerators.ImageArtifactDetails)
-        .Sample((detailsA, detailsB) =>
+        .Sample((generatedA, generatedB) =>
         {
-            // Ensure repos don't overlap
-            foreach (RepoData repo in detailsA.Repos)
-            {
-                repo.Repo = $"a/{repo.Repo}";
-            }
-            foreach (RepoData repo in detailsB.Repos)
-            {
-                repo.Repo = $"b/{repo.Repo}";
-            }
+            V2.ImageArtifactDetails detailsA = PrefixRepos(generatedA, "a/");
+            V2.ImageArtifactDetails detailsB = PrefixRepos(generatedB, "b/");
 
-            // Old merge (mutating)
-            ImageArtifactDetails oldTarget = new();
-            ImageInfoHelper.MergeImageArtifactDetails(detailsA, oldTarget);
-            ImageInfoHelper.MergeImageArtifactDetails(detailsB, oldTarget);
-            string oldJson = JsonHelper.SerializeObject(oldTarget);
+            MergeJsonScenario scenario = new(
+                SourceJsons:
+                [
+                    ImageInfoSerializer.Serialize(detailsA),
+                    ImageInfoSerializer.Serialize(detailsB),
+                ],
+                TargetJson: null,
+                Options: new ImageInfoMergeOptions());
 
-            // New merge (immutable)
-            V2.ImageArtifactDetails v2A = ConvertToV2(detailsA);
-            V2.ImageArtifactDetails v2B = ConvertToV2(detailsB);
-            V2.ImageArtifactDetails v2Result = ImageInfoMerger.Merge(v2A, new V2.ImageArtifactDetails());
-            v2Result = ImageInfoMerger.Merge(v2B, v2Result);
-            string newJson = ImageInfoSerializer.Serialize(v2Result);
-
-            newJson.ShouldBe(oldJson);
+            AssertMergeOutputsMatch(scenario, MergeOldJson, MergeNewJson);
         });
     }
 
@@ -68,17 +64,69 @@ public class MergeMigrationPropertyTests
     {
         ImageInfoGenerators.ImageArtifactDetails.Sample(source =>
         {
-            // Old merge
-            ImageArtifactDetails oldTarget = new();
-            ImageInfoHelper.MergeImageArtifactDetails(source, oldTarget);
-            string oldJson = JsonHelper.SerializeObject(oldTarget);
+            MergeJsonScenario scenario = new(
+                SourceJsons: [ImageInfoSerializer.Serialize(source)],
+                TargetJson: null,
+                Options: new ImageInfoMergeOptions());
 
-            // New merge
-            V2.ImageArtifactDetails v2Source = ConvertToV2(source);
-            V2.ImageArtifactDetails v2Result = ImageInfoMerger.Merge(v2Source, new V2.ImageArtifactDetails());
-            string newJson = ImageInfoSerializer.Serialize(v2Result);
+            AssertMergeOutputsMatch(scenario, MergeOldJson, MergeNewJson);
+        });
+    }
 
-            newJson.ShouldBe(oldJson);
+    /// <summary>
+    /// Build and publish merge modes handle replaceable string lists differently,
+    /// and the new merger matches the old helper at the manifest + JSON boundary.
+    /// </summary>
+    [Fact]
+    public void Merge_ReplaceableManifestSharedTags_MatchesOldBehavior()
+    {
+        using TempFolderContext tempFolderContext = new();
+
+        string dockerfilePath = CreateDockerfile("1.0/repo/linux", tempFolderContext);
+        Manifest manifest = CreateManifest(
+            CreateRepo("repo",
+                CreateImage(
+                    [
+                        CreatePlatform(dockerfilePath, ["platform-tag"])
+                    ],
+                    productVersion: "1.0")));
+
+        string manifestPath = Path.Combine(tempFolderContext.Path, "manifest.json");
+        File.WriteAllText(manifestPath, JsonHelper.SerializeObject(manifest));
+        ManifestInfo manifestInfo = TestHelper.CreateManifestJsonService()
+            .Load(GetManifestOptions(manifestPath));
+
+        ImageInfoGenerators.MergeStringListScenario.Sample(scenario =>
+        {
+            MergeJsonScenario mergeScenario = new(
+                SourceJsons:
+                [
+                    CreateSinglePlatformDetailsJson(
+                        repo: "repo",
+                        productVersion: "1.0",
+                        dockerfile: dockerfilePath,
+                        architecture: "amd64",
+                        osType: "Linux",
+                        osVersion: "noble",
+                        sharedTags: scenario.Source,
+                        simpleTags: ["platform-tag"],
+                        digest: "repo@sha256:source"),
+                ],
+                TargetJson: CreateSinglePlatformDetailsJson(
+                    repo: "repo",
+                    productVersion: "1.0",
+                    dockerfile: dockerfilePath,
+                    architecture: "amd64",
+                    osType: "Linux",
+                    osVersion: "noble",
+                    sharedTags: scenario.Target,
+                    simpleTags: ["platform-tag"],
+                    digest: "repo@sha256:target"),
+                Options: new ImageInfoMergeOptions { IsPublish = scenario.IsPublish },
+                ManifestInfo: manifestInfo,
+                SkipManifestValidation: scenario.IsPublish);
+
+            AssertMergeOutputsMatch(mergeScenario, MergeOldJson, MergeNewJson);
         });
     }
 
@@ -91,7 +139,7 @@ public class MergeMigrationPropertyTests
     {
         ImageInfoGenerators.ImageArtifactDetails.Sample(source =>
         {
-            V2.ImageArtifactDetails v2Source = ConvertToV2(source);
+            V2.ImageArtifactDetails v2Source = ImageInfoSerializer.Deserialize(ImageInfoSerializer.Serialize(source));
             V2.ImageArtifactDetails first = ImageInfoMerger.Merge(v2Source, new V2.ImageArtifactDetails());
             V2.ImageArtifactDetails second = ImageInfoMerger.Merge(first, new V2.ImageArtifactDetails());
 
@@ -109,7 +157,7 @@ public class MergeMigrationPropertyTests
     {
         ImageInfoGenerators.ImageArtifactDetails.Sample(source =>
         {
-            V2.ImageArtifactDetails v2Source = ConvertToV2(source);
+            V2.ImageArtifactDetails v2Source = ImageInfoSerializer.Deserialize(ImageInfoSerializer.Serialize(source));
             V2.ImageArtifactDetails v2Target = new V2.ImageArtifactDetails
             {
                 Repos =
@@ -135,49 +183,117 @@ public class MergeMigrationPropertyTests
         });
     }
 
-    private static V2.ImageArtifactDetails ConvertToV2(ImageArtifactDetails old) =>
-        new()
+    private static void AssertMergeOutputsMatch(
+        MergeJsonScenario scenario,
+        Func<MergeJsonScenario, string> oldMerge,
+        Func<MergeJsonScenario, string> newMerge)
+    {
+        string oldJson = oldMerge(scenario);
+        string newJson = newMerge(scenario);
+
+        newJson.ShouldBe(oldJson);
+    }
+
+    private static string MergeOldJson(MergeJsonScenario scenario)
+    {
+        ImageArtifactDetails target = scenario.TargetJson is null
+            ? new ImageArtifactDetails()
+            : DeserializeOld(scenario.TargetJson, scenario);
+
+        foreach (string sourceJson in scenario.SourceJsons)
         {
-            Repos = old.Repos.Select(ConvertRepo).ToList(),
+            ImageArtifactDetails source = DeserializeOld(sourceJson, scenario);
+            ImageInfoHelper.MergeImageArtifactDetails(source, target, scenario.Options);
+        }
+
+        return JsonHelper.SerializeObject(target);
+    }
+
+    private static string MergeNewJson(MergeJsonScenario scenario)
+    {
+        V2.ImageArtifactDetails target = scenario.TargetJson is null
+            ? new V2.ImageArtifactDetails()
+            : ImageInfoSerializer.Deserialize(scenario.TargetJson);
+
+        foreach (string sourceJson in scenario.SourceJsons)
+        {
+            V2.ImageArtifactDetails source = ImageInfoSerializer.Deserialize(sourceJson);
+            target = ImageInfoMerger.Merge(source, target, scenario.Options);
+        }
+
+        return ImageInfoSerializer.Serialize(target);
+    }
+
+    private static ImageArtifactDetails DeserializeOld(string json, MergeJsonScenario scenario) =>
+        scenario.ManifestInfo is null
+            ? ImageArtifactDetails.FromJson(json)
+            : ImageInfoHelper.LoadFromContent(
+                json,
+                scenario.ManifestInfo,
+                skipManifestValidation: scenario.SkipManifestValidation);
+
+    private static string CreateSinglePlatformDetailsJson(
+        string repo,
+        string productVersion,
+        string dockerfile,
+        string architecture,
+        string osType,
+        string osVersion,
+        IReadOnlyList<string> sharedTags,
+        List<string>? simpleTags = null,
+        string digest = "dotnet/runtime@sha256:abc123")
+    {
+        V2.ImageArtifactDetails details = new()
+        {
+            Repos =
+            [
+                new V2.RepoData
+                {
+                    Repo = repo,
+                    Images =
+                    [
+                        new V2.ImageData
+                        {
+                            ProductVersion = productVersion,
+                            Manifest = new V2.ManifestData
+                            {
+                                SharedTags = sharedTags.ToList(),
+                            },
+                            Platforms =
+                            [
+                                new V2.PlatformData
+                                {
+                                    Dockerfile = dockerfile,
+                                    Architecture = architecture,
+                                    OsType = osType,
+                                    OsVersion = osVersion,
+                                    Digest = digest,
+                                    SimpleTags = simpleTags ?? [],
+                                    CommitUrl = "https://github.com/dotnet/dotnet-docker/commit/abc123",
+                                }
+                            ],
+                        }
+                    ],
+                }
+            ],
         };
 
-    private static V2.RepoData ConvertRepo(RepoData old) =>
-        new()
+        return ImageInfoSerializer.Serialize(details);
+    }
+
+    private static V2.ImageArtifactDetails PrefixRepos(V2.ImageArtifactDetails details, string prefix) =>
+        details with
         {
-            Repo = old.Repo,
-            Images = old.Images.Select(ConvertImage).ToList(),
+            Repos = details.Repos.Select(repo => repo with
+            {
+                Repo = $"{prefix}{repo.Repo}",
+            }).ToList(),
         };
 
-    private static V2.ImageData ConvertImage(ImageData old) =>
-        new()
-        {
-            ProductVersion = old.ProductVersion,
-            Manifest = old.Manifest is not null ? ConvertManifest(old.Manifest) : null,
-            Platforms = old.Platforms.Select(ConvertPlatform).ToList(),
-        };
-
-    private static V2.ManifestData ConvertManifest(ManifestData old) =>
-        new()
-        {
-            Digest = old.Digest,
-            Created = old.Created,
-            SharedTags = old.SharedTags?.ToList() ?? [],
-            SyndicatedDigests = old.SyndicatedDigests?.ToList() ?? [],
-        };
-
-    private static V2.PlatformData ConvertPlatform(PlatformData old) =>
-        new()
-        {
-            Dockerfile = old.Dockerfile,
-            SimpleTags = old.SimpleTags?.ToList() ?? [],
-            Digest = old.Digest,
-            BaseImageDigest = old.BaseImageDigest,
-            OsType = old.OsType,
-            OsVersion = old.OsVersion,
-            Architecture = old.Architecture,
-            Created = old.Created,
-            CommitUrl = old.CommitUrl,
-            Layers = old.Layers?.Select(layer => new V2.Layer(layer.Digest, layer.Size)).ToList() ?? [],
-            IsUnchanged = old.IsUnchanged,
-        };
+    private sealed record MergeJsonScenario(
+        IReadOnlyList<string> SourceJsons,
+        string? TargetJson,
+        ImageInfoMergeOptions Options,
+        ManifestInfo? ManifestInfo = null,
+        bool SkipManifestValidation = false);
 }
