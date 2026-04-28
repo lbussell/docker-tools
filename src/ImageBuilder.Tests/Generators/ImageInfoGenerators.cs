@@ -24,7 +24,7 @@ public static class ImageInfoGenerators
     private static readonly string[] RepoNames = ["dotnet/sdk", "dotnet/aspnet", "dotnet/runtime", "dotnet/runtime-deps", "dotnet/monitor"];
     private static readonly string[] ProductVersions = ["8.0", "8.0.15", "9.0", "9.0.5", "10.0", "10.0.0-preview.1"];
 
-    private static readonly Gen<char> HexChar =
+    internal static readonly Gen<char> HexChar =
         Gen.OneOfConst('0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f');
 
     /// <summary>
