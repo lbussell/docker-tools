@@ -197,6 +197,7 @@ public static class ImageInfoMergeScenarioGenerators
     /// <summary>
     /// Generates scenarios testing product version equivalence rules:
     /// same major.minor should match, different major.minor should not.
+    /// Uses a shared Dockerfile path so only the product version differs.
     /// </summary>
     public static Gen<ImageInfoMergeScenario> ProductVersionEquivalence { get; } =
         Gen.Select(
@@ -209,8 +210,12 @@ public static class ImageInfoMergeScenarioGenerators
             SimpleTag.List[1, 3])
         .Select((repo, versionPair, osVersion, arch, digest1, digest2, tags) =>
         {
-            string targetJson = SerializeDetails(repo, versionPair.Version1, osVersion, arch, digest1, tags);
-            string sourceJson = SerializeDetails(repo, versionPair.Version2, osVersion, arch, digest2, tags);
+            // Use a shared Dockerfile path so only the product version differs
+            string sharedDockerfile = $"src/runtime/{osVersion}/{arch}/Dockerfile";
+            string targetJson = SerializeDetails(repo, versionPair.Version1, osVersion, arch, digest1, tags,
+                dockerfile: sharedDockerfile);
+            string sourceJson = SerializeDetails(repo, versionPair.Version2, osVersion, arch, digest2, tags,
+                dockerfile: sharedDockerfile);
 
             return new ImageInfoMergeScenario(
                 SourceJsons: [sourceJson],
@@ -263,9 +268,10 @@ public static class ImageInfoMergeScenarioGenerators
         string digest,
         IReadOnlyList<string> simpleTags,
         IReadOnlyList<V2.Layer>? layers = null,
-        IReadOnlyList<string>? sharedTags = null)
+        IReadOnlyList<string>? sharedTags = null,
+        string? dockerfile = null)
     {
-        string dockerfile = $"src/{version}/{osVersion}/{architecture}/Dockerfile";
+        dockerfile ??= $"src/{version}/{osVersion}/{architecture}/Dockerfile";
         string fullDigest = $"{repo}@{digest}";
 
         V2.ManifestData? manifest = sharedTags is not null

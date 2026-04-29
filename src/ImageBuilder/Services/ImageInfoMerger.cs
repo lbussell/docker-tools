@@ -210,23 +210,39 @@ public static class ImageInfoMerger
             .ToList();
     }
 
-    private static V2.ImageData? FindMatchingImage(V2.ImageData source, List<V2.ImageData> targets) =>
-        targets.FirstOrDefault(target => AreImagesEquivalent(source, target));
+    /// <summary>
+    /// Finds the target image that matches the source, if any.
+    /// Uses product-version equivalence as primary match. When multiple candidates
+    /// share the same version, disambiguates using first-platform-key identity.
+    /// A single version-equivalent candidate always matches (supporting multi-leg
+    /// aggregation where each leg has a different architecture).
+    /// </summary>
+    private static V2.ImageData? FindMatchingImage(V2.ImageData source, List<V2.ImageData> targets)
+    {
+        List<V2.ImageData> candidates = targets
+            .Where(target => AreImagesEquivalent(source, target))
+            .ToList();
+
+        if (candidates.Count <= 1)
+        {
+            return candidates.FirstOrDefault();
+        }
+
+        // Multiple candidates with the same version: disambiguate by first platform key
+        return candidates.FirstOrDefault(candidate => HaveSameFirstPlatformKey(source, candidate));
+    }
 
     private static V2.PlatformData? FindMatchingPlatform(V2.PlatformData source, List<V2.PlatformData> targets) =>
         targets.FirstOrDefault(target => ComparePlatforms(source, target) == 0);
 
     /// <summary>
-    /// Determines whether two images represent the same logical image and should be merged.
-    /// This mirrors the old <c>ManifestImage</c> object-identity matching: within a repo,
-    /// images are identified by product version. Different build legs for the same image
-    /// have different architectures but the same product version.
+    /// Determines whether two images have equivalent identity (same logical image).
     /// </summary>
     /// <remarks>
     /// <list type="bullet">
-    ///   <item>Both empty-platform: exact version match required (no platform identity available).</item>
+    ///   <item>Both empty-platform: exact version match (no platform identity to disambiguate).</item>
     ///   <item>One empty, one populated: never equivalent (different structural kinds).</item>
-    ///   <item>Both populated: major.minor product-version equivalence is sufficient.</item>
+    ///   <item>Both populated: major.minor product-version equivalence.</item>
     /// </list>
     /// </remarks>
     private static bool AreImagesEquivalent(V2.ImageData a, V2.ImageData b)
@@ -242,6 +258,27 @@ public static class ImageInfoMerger
         }
 
         return ImageInfoIdentity.AreProductVersionsEquivalent(a.ProductVersion, b.ProductVersion);
+    }
+
+    /// <summary>
+    /// Checks whether two images have the same first-platform identity key.
+    /// Used to disambiguate when multiple images share the same product version.
+    /// </summary>
+    private static bool HaveSameFirstPlatformKey(V2.ImageData a, V2.ImageData b)
+    {
+        V2.PlatformData? firstA = a.Platforms
+            .OrderBy(p => p, Comparer<V2.PlatformData>.Create(ComparePlatforms))
+            .FirstOrDefault();
+        V2.PlatformData? firstB = b.Platforms
+            .OrderBy(p => p, Comparer<V2.PlatformData>.Create(ComparePlatforms))
+            .FirstOrDefault();
+
+        if (firstA is null || firstB is null)
+        {
+            return firstA is null && firstB is null;
+        }
+
+        return ComparePlatforms(firstA, firstB) == 0;
     }
 
     /// <summary>

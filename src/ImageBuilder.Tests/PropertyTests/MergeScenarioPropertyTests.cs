@@ -26,11 +26,8 @@ namespace Microsoft.DotNet.ImageBuilder.Tests.PropertyTests;
 /// Tests either differentially compare old and new merge implementations
 /// or verify V2 merger structural properties directly.
 /// </summary>
-public class MergeScenarioPropertyTests : IDisposable
+public class MergeScenarioPropertyTests
 {
-    private readonly TempFolderContext _tempFolder = new();
-
-    public void Dispose() => _tempFolder.Dispose();
 
     #region Golden regression fixture
 
@@ -83,6 +80,7 @@ public class MergeScenarioPropertyTests : IDisposable
     [Fact]
     public void Merge_GoldenRepro_MatchesOldBehavior()
     {
+        using TempFolderContext tempFolder = new();
         string[] repos = ["dotnet/nightly/runtime-deps", "dotnet/nightly/runtime"];
         string[] versions = ["8.0.26", "9.0.15"];
         string[] architectures = ["amd64", "arm32", "arm64"];
@@ -98,7 +96,7 @@ public class MergeScenarioPropertyTests : IDisposable
                 foreach (string arch in architectures)
                 {
                     string dockerfilePath = CreateDockerfile(
-                        $"src/{version}/bookworm-slim/{arch}", _tempFolder);
+                        $"src/{version}/bookworm-slim/{arch}", tempFolder);
                     (Architecture archEnum, string? variant) = ParseArchitecture(arch);
                     imagePlatforms.Add(CreatePlatform(
                         dockerfilePath,
@@ -113,7 +111,7 @@ public class MergeScenarioPropertyTests : IDisposable
         }
 
         Manifest manifest = CreateManifest(manifestRepos.ToArray());
-        string manifestPath = Path.Combine(_tempFolder.Path, "manifest.json");
+        string manifestPath = Path.Combine(tempFolder.Path, "manifest.json");
         File.WriteAllText(manifestPath, JsonHelper.SerializeObject(manifest));
         ManifestInfo manifestInfo = TestHelper.CreateManifestJsonService()
             .Load(GetManifestOptions(manifestPath));
@@ -229,18 +227,15 @@ public class MergeScenarioPropertyTests : IDisposable
     }
 
     /// <summary>
-    /// Product version equivalence: same major.minor versions should merge into one image.
+    /// Product version equivalence: same major.minor versions with matching platform
+    /// identity should merge, matching old manifest-linked behavior.
     /// </summary>
     [Fact]
-    public void Merge_ProductVersionEquivalence_MergesSameMajorMinor()
+    public void Merge_ProductVersionEquivalence_MatchesOldBehavior()
     {
         ImageInfoMergeScenarioGenerators.ProductVersionEquivalence.Sample(scenario =>
         {
-            V2.ImageArtifactDetails result = MergeV2(scenario);
-
-            V2.RepoData repo = result.Repos.ShouldHaveSingleItem();
-            repo.Images.Count.ShouldBe(1,
-                $"Same major.minor versions should merge. Scenario: {scenario.Description}");
+            AssertOldNewMatch(scenario);
         }, iter: 200);
     }
 
@@ -304,7 +299,7 @@ public class MergeScenarioPropertyTests : IDisposable
         return target;
     }
 
-    private void AssertOldNewMatch(ImageInfoMergeScenario scenario)
+    private static void AssertOldNewMatch(ImageInfoMergeScenario scenario)
     {
         string oldJson = MergeOldJson(scenario);
         string newJson = MergeNewJson(scenario);
@@ -312,9 +307,10 @@ public class MergeScenarioPropertyTests : IDisposable
         newJson.ShouldBe(oldJson, $"Scenario: {scenario.Description}");
     }
 
-    private string MergeOldJson(ImageInfoMergeScenario scenario)
+    private static string MergeOldJson(ImageInfoMergeScenario scenario)
     {
-        ManifestInfo manifestInfo = BuildManifestForScenario(scenario);
+        using TempFolderContext tempFolder = new();
+        ManifestInfo manifestInfo = BuildManifestForScenario(scenario, tempFolder);
 
         ImageArtifactDetails target = scenario.InitialTargetJson is not null
             ? ImageInfoHelper.LoadFromContent(
@@ -352,7 +348,7 @@ public class MergeScenarioPropertyTests : IDisposable
         return target;
     }
 
-    private ManifestInfo BuildManifestForScenario(ImageInfoMergeScenario scenario)
+    private static ManifestInfo BuildManifestForScenario(ImageInfoMergeScenario scenario, TempFolderContext tempFolder)
     {
         List<string> allJsons = [.. scenario.SourceJsons];
         if (scenario.InitialTargetJson is not null)
@@ -364,52 +360,61 @@ public class MergeScenarioPropertyTests : IDisposable
             .Select(ImageInfoSerializer.Deserialize)
             .ToList();
 
-        Dictionary<string, Dictionary<string, List<V2.PlatformData>>> repoVersionPlatforms = [];
+        // Group by repo, then by version-equivalent groups, collecting unique platforms.
+        // Version-equivalent images (same major.minor) share one manifest Image entry,
+        // matching production manifests where one Image covers all patch versions.
+        Dictionary<string, Dictionary<string, (string Version, List<V2.PlatformData> Platforms)>> repoImageGroups = [];
 
         foreach (V2.ImageArtifactDetails details in allDetails)
         {
             foreach (V2.RepoData repo in details.Repos)
             {
-                if (!repoVersionPlatforms.TryGetValue(repo.Repo, out Dictionary<string, List<V2.PlatformData>>? versionMap))
+                if (!repoImageGroups.TryGetValue(repo.Repo, out var imageMap))
                 {
-                    versionMap = [];
-                    repoVersionPlatforms[repo.Repo] = versionMap;
+                    imageMap = [];
+                    repoImageGroups[repo.Repo] = imageMap;
                 }
 
                 foreach (V2.ImageData image in repo.Images)
                 {
-                    string versionKey = image.ProductVersion ?? "";
-                    if (!versionMap.TryGetValue(versionKey, out List<V2.PlatformData>? platforms))
+                    string majorMinor = ImageInfoIdentity.GetMajorMinorVersion(image.ProductVersion)
+                        ?? image.ProductVersion ?? "";
+
+                    if (!imageMap.TryGetValue(majorMinor, out var group))
                     {
-                        platforms = [];
-                        versionMap[versionKey] = platforms;
+                        group = (image.ProductVersion ?? "", []);
+                        imageMap[majorMinor] = group;
                     }
 
                     foreach (V2.PlatformData platform in image.Platforms)
                     {
                         string platformKey = ImageInfoIdentity.GetPlatformKey(platform);
-                        if (!platforms.Any(p => ImageInfoIdentity.GetPlatformKey(p) == platformKey))
+                        if (!group.Platforms.Any(p => ImageInfoIdentity.GetPlatformKey(p) == platformKey))
                         {
-                            platforms.Add(platform);
+                            group.Platforms.Add(platform);
                         }
                     }
                 }
             }
         }
 
+        // Build manifest from grouped data
         List<Repo> manifestRepos = [];
-        foreach ((string repoName, Dictionary<string, List<V2.PlatformData>> versionMap) in repoVersionPlatforms)
+        foreach ((string repoName, var imageMap) in repoImageGroups)
         {
             List<Image> images = [];
-            foreach ((string version, List<V2.PlatformData> platforms) in versionMap)
+            foreach ((string _, (string version, List<V2.PlatformData> platforms)) in imageMap)
             {
                 List<Platform> manifestPlatforms = [];
+                // Collect all unique tags across all platforms for deduplication
+                HashSet<string> usedTags = [];
+
                 foreach (V2.PlatformData platform in platforms)
                 {
                     string dockerfilePath = CreateDockerfile(
-                        Path.GetDirectoryName(platform.Dockerfile)!, _tempFolder);
-                    // Deduplicate tags for the manifest (duplicate tags cause ArgumentException)
-                    string[] tags = platform.SimpleTags.Distinct().ToArray();
+                        Path.GetDirectoryName(platform.Dockerfile)!, tempFolder);
+                    // Only include tags that haven't been used by another platform in this image
+                    string[] tags = platform.SimpleTags.Where(t => usedTags.Add(t)).ToArray();
 
                     (Architecture archEnum, string? variant) = ParseArchitecture(platform.Architecture);
                     manifestPlatforms.Add(CreatePlatform(
@@ -430,7 +435,7 @@ public class MergeScenarioPropertyTests : IDisposable
         }
 
         Manifest manifest = CreateManifest(manifestRepos.ToArray());
-        string manifestPath = Path.Combine(_tempFolder.Path, $"manifest-{Guid.NewGuid():N}.json");
+        string manifestPath = Path.Combine(tempFolder.Path, $"manifest-{Guid.NewGuid():N}.json");
         File.WriteAllText(manifestPath, JsonHelper.SerializeObject(manifest));
 
         return TestHelper.CreateManifestJsonService()
