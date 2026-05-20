@@ -28,7 +28,7 @@ parameters:
 jobs:
 - job: ${{ parameters.jobName }}
   pool:
-    name: $(default1ESInternalPoolName)
+    name: NetReleasePool
     image: $(default1ESInternalPoolImage)
     os: linux
   steps:
