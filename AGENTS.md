@@ -14,6 +14,7 @@ This repo contains several projects:
 - **`src/ImageBuilder/`** - The main ImageBuilder CLI tool (executable)
 - **`src/ImageBuilder.Models/`** - Shared model definitions for manifest files and image metadata
 - **`src/ImageBuilder.Tests/`** - Unit tests using xUnit, Moq, and Shouldly
+- **`src/Infrastructure/`** - Library (`Microsoft.DotNet.DockerTools.Infrastructure`) that embeds a copy of `eng/docker-tools/` so ImageBuilder can ship and re-emit its own pipeline templates
 - **`eng/src/file-pusher/`** - Utility for pushing files to storage
 - **`eng/src/yaml-updater/`** - Utility for updating YAML files
 
@@ -53,6 +54,15 @@ This repository is the source of truth for these files - changes made here are a
 Breaking changes to `eng/docker-tools/` must be documented in `eng/docker-tools/CHANGELOG.md` with actionable migration steps for downstream repos.
 
 For comprehensive documentation on the docker-tools infrastructure, pipeline architecture, image building workflows, and troubleshooting, see [eng/docker-tools/DEV-GUIDE.md](eng/docker-tools/DEV-GUIDE.md).
+
+### Templates Bundled In ImageBuilder
+
+ImageBuilder ships a copy of the entire `eng/docker-tools/` directory so that source-code changes and pipeline-template changes can be made together in the same commit, instead of split across the two-step process described below.
+
+- The `src/Infrastructure/` project (`Microsoft.DotNet.DockerTools.Infrastructure`) keeps a copy of `eng/docker-tools/` under `src/Infrastructure/content/` and embeds it into the assembly as resources. ImageBuilder references this project. (The copy must live under `src/` because the Docker build context is `src/`, so `eng/docker-tools/` is not reachable from the container build.)
+- The `update` command writes those embedded files back to disk. It must be run from the root of a git repository and always targets `eng/docker-tools` relative to that root: `dotnet run --project src/ImageBuilder -- update --no-version-logging`. It performs a full mirror (deletes files ImageBuilder no longer ships and prunes empty directories) so the output exactly matches what is embedded. If `eng/docker-tools` does not already exist, the command fails unless `--init` is passed (used when onboarding a repo).
+- **The two copies must be kept in sync.** When changing pipeline templates or scripts, edit `eng/docker-tools/` and mirror the change into `src/Infrastructure/content/` (or edit `src/Infrastructure/content/` and run `update` to regenerate `eng/docker-tools/`). There is no automated test enforcing this.
+- The intended end state is for the automated ImageBuilder-tag-bump PR (`eng/pipelines/update-image-builder-tag.yml`) to run `imagebuilder update` so a new ImageBuilder version also emits its matching `eng/docker-tools/` content. Wiring that pipeline step is a follow-up.
 
 ### Service Connections and Authentication
 

@@ -2,6 +2,7 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
@@ -20,6 +21,14 @@ public sealed class FileSystem : IFileSystem
     /// <inheritdoc/>
     public Task WriteAllTextAsync(string path, string? contents, CancellationToken cancellationToken = default) =>
         File.WriteAllTextAsync(path, contents, cancellationToken);
+
+    /// <inheritdoc/>
+    public void WriteAllBytes(string path, byte[] bytes) =>
+        File.WriteAllBytes(path, bytes);
+
+    /// <inheritdoc/>
+    public Task WriteAllBytesAsync(string path, byte[] bytes, CancellationToken cancellationToken = default) =>
+        File.WriteAllBytesAsync(path, bytes, cancellationToken);
 
     /// <inheritdoc/>
     public byte[] ReadAllBytes(string path) =>
@@ -42,10 +51,30 @@ public sealed class FileSystem : IFileSystem
         File.Exists(path);
 
     /// <inheritdoc/>
+    public bool DirectoryExists(string path) =>
+        Directory.Exists(path);
+
+    /// <inheritdoc/>
     public void DeleteFile(string path) =>
         File.Delete(path);
 
     /// <inheritdoc/>
+    public void DeleteDirectory(string path) =>
+        Directory.Delete(path);
+
+    /// <inheritdoc/>
     public DirectoryInfo CreateDirectory(string path) =>
         Directory.CreateDirectory(path);
+
+    /// <inheritdoc/>
+    public string GetCurrentDirectory() =>
+        Directory.GetCurrentDirectory();
+
+    /// <inheritdoc/>
+    public IEnumerable<string> EnumerateFiles(string path) =>
+        Directory.EnumerateFiles(path, "*", SearchOption.AllDirectories);
+
+    /// <inheritdoc/>
+    public IEnumerable<string> EnumerateDirectories(string path) =>
+        Directory.EnumerateDirectories(path, "*", SearchOption.AllDirectories);
 }

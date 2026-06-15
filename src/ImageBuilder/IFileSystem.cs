@@ -2,6 +2,7 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
@@ -22,6 +23,16 @@ public interface IFileSystem
     /// Asynchronously creates a new file, writes the specified string to the file, and then closes the file.
     /// </summary>
     Task WriteAllTextAsync(string path, string? contents, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Creates a new file, writes the specified byte array to the file, and then closes the file.
+    /// </summary>
+    void WriteAllBytes(string path, byte[] bytes);
+
+    /// <summary>
+    /// Asynchronously creates a new file, writes the specified byte array to the file, and then closes the file.
+    /// </summary>
+    Task WriteAllBytesAsync(string path, byte[] bytes, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Opens a binary file, reads the contents into a byte array, and then closes the file.
@@ -49,12 +60,37 @@ public interface IFileSystem
     bool FileExists(string path);
 
     /// <summary>
+    /// Determines whether the specified directory exists.
+    /// </summary>
+    bool DirectoryExists(string path);
+
+    /// <summary>
     /// Deletes the specified file.
     /// </summary>
     void DeleteFile(string path);
 
     /// <summary>
+    /// Deletes the specified empty directory.
+    /// </summary>
+    void DeleteDirectory(string path);
+
+    /// <summary>
     /// Creates all directories and subdirectories in the specified path unless they already exist.
     /// </summary>
     DirectoryInfo CreateDirectory(string path);
+
+    /// <summary>
+    /// Gets the current working directory of the application.
+    /// </summary>
+    string GetCurrentDirectory();
+
+    /// <summary>
+    /// Returns the full paths of all files under <paramref name="path"/>, including subdirectories.
+    /// </summary>
+    IEnumerable<string> EnumerateFiles(string path);
+
+    /// <summary>
+    /// Returns the full paths of all directories under <paramref name="path"/>, including subdirectories.
+    /// </summary>
+    IEnumerable<string> EnumerateDirectories(string path);
 }

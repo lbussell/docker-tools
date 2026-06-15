@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <RootNamespace>Microsoft.DotNet.DockerTools.Infrastructure</RootNamespace>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+
+    <!-- This package is referenced by ImageBuilder, but not shipped as a standalone package. -->
+    <IsPackable>false</IsPackable>
+
+    <!-- Keep this assembly Native AOT/trim compatible even though ImageBuilder isn't published via Native AOT -->
+    <IsAotCompatible>true</IsAotCompatible>
+
+    <!-- Explicit Nullable setting required for Docker builds from src/ context (won't see root Directory.Build.props).
+         Tracking issue for fixing context directory: https://github.com/dotnet/docker-tools/issues/1592 -->
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <!-- Embed a copy of the eng/docker-tools infrastructure (pipeline templates, scripts, and docs) so that a matching
+       ImageBuilder version can write these files back out via the 'update' command. The LogicalName preserves each
+       file's path relative to the content folder. -->
+  <ItemGroup>
+    <EmbeddedResource Include="content/**/*">
+      <LogicalName>Content/%(RecursiveDir)%(Filename)%(Extension)</LogicalName>
+    </EmbeddedResource>
+    <None Remove="content/**/*" />
+  </ItemGroup>
+
+</Project>
