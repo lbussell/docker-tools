@@ -134,6 +134,16 @@ These files contain:
 Image info files are used by subsequent pipeline stages and are published to the versions repository to track what was built.
 See [eng/docker-tools/DEV-GUIDE.md](eng/docker-tools/DEV-GUIDE.md) for more details on how image info flows through pipelines.
 
+## Architecture Decision Records (ADRs)
+
+Architecturally significant decisions are recorded as ADRs in [documentation/adr/](documentation/adr/).
+
+**Consult existing ADRs before you act.** Before making an architectural change, reworking infrastructure, or "fixing" something that looks odd, scan [documentation/adr/](documentation/adr/) (the filenames are descriptive slugs; grep for relevant keywords) to check whether the decision was already made deliberately. If an ADR explains the current approach, honor it — or, if you believe it should change, supersede it with a new ADR rather than silently reversing it. This prevents re-litigating settled trade-offs and undoing intentional choices.
+
+**Add a new ADR** when **all three** are true: the decision is hard to reverse, surprising without context, and the result of a real trade-off between genuine alternatives. Skip decisions that are easy to reverse, unsurprising, or had no real alternative.
+
+For the format, numbering, optional sections, and a fuller description of what qualifies, see [documentation/adr/0000-adr-format.md](documentation/adr/0000-adr-format.md).
+
 ## Documentation Maintenance
 
 When making changes to ImageBuilder, pipeline templates, or infrastructure:
@@ -142,6 +152,7 @@ When making changes to ImageBuilder, pipeline templates, or infrastructure:
 - Update [src/README.md](src/README.md) if you change how ImageBuilder container images are built
 - Update [documentation/manifest-file.md](documentation/manifest-file.md) if you modify the manifest schema
 - Update [eng/docker-tools/CHANGELOG.md](eng/docker-tools/CHANGELOG.md) if you make breaking changes to `eng/docker-tools/` templates
+- Add an ADR under [documentation/adr/](documentation/adr/) if you make an architecturally significant decision (see the ADR section above)
 - Update this file (AGENTS.md) if you add projects, change fundamental workflows, or modify architecture that affects how developers work with the codebase
 
 Keep documentation synchronized with code changes so future developers have accurate guidance.
