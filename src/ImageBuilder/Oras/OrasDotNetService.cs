@@ -3,6 +3,7 @@
 // See the LICENSE file in the project root for more information.
 
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -48,6 +49,20 @@ public class OrasDotNetService(
     private readonly IFileSystem _fileSystem = fileSystem;
     private readonly ILogger<OrasDotNetService> _logger = logger;
     private readonly OrasCredentialProviderAdapter _credentialProvider = new(credentialsProvider, credentialsHost);
+
+    /// <summary>
+    /// Per-repository ORAS <see cref="Client"/> instances, keyed by "registry/repository". Reusing one
+    /// client per repository keeps its <see cref="ScopeManager"/> alive across operations. ORAS seeds the
+    /// scope on every request (e.g. ManifestStore/Repository call SetActionsForRepository before sending),
+    /// but it stores that scope in the client's ScopeManager - not in the shared token cache. The token
+    /// cache is keyed by host plus scope, so unless the ScopeManager (and therefore the scope) survives,
+    /// each operation looks up an empty-scope key, misses the cache, and triggers a fresh 401 challenge and
+    /// token fetch. A separate client per repository keeps each repository's scope (and token) isolated,
+    /// avoiding an ever-growing unioned scope per host.
+    /// See the ORAS cache-key logic (v0.5.0):
+    /// https://github.com/oras-project/oras-dotnet/blob/84309e748527589539e3a2736df260d1c3e9a09b/src/OrasProject.Oras/Registry/Remote/Auth/Client.cs#L548-L550
+    /// </summary>
+    private readonly ConcurrentDictionary<string, Client> _clients = new();
 
     /// <inheritdoc/>
     public async Task<Descriptor> GetDescriptorAsync(string reference, CancellationToken cancellationToken = default)
@@ -222,7 +237,8 @@ public class OrasDotNetService(
     }
 
     /// <summary>
-    /// Creates an authenticated ORAS repository client for the given reference.
+    /// Creates an ORAS repository client for the given reference, backed by a per-repository
+    /// <see cref="Client"/> so that cached OAuth tokens are reused across operations on the same repository.
     /// </summary>
     /// <param name="reference">Full registry reference (e.g., "registry.io/repo:tag").</param>
     private Repository CreateRepository(string reference)
@@ -233,16 +249,33 @@ public class OrasDotNetService(
             "Parsed reference: Registry={Registry}, Repository={Repository}, Reference={ContentReference}",
             parsedRef.Registry, parsedRef.Repository, parsedRef.ContentReference);
 
-        HttpClient httpClient = _httpClientFactory.CreateClient(nameof(OrasDotNetService));
-        Client authClient = new(httpClient, _credentialProvider, _orasCache);
-
         RepositoryOptions repositoryOptions = new()
         {
             Reference = parsedRef,
-            Client = authClient
+            Client = GetOrCreateClient(parsedRef)
         };
 
         Repository repository = new(repositoryOptions);
         return repository;
+    }
+
+    /// <summary>
+    /// Gets (or creates) the ORAS <see cref="Client"/> for the repository identified by
+    /// <paramref name="parsedRef"/>, reusing it across operations so its <see cref="ScopeManager"/>
+    /// (and the host-plus-scope keyed OAuth token cache) is reused rather than rebuilt per
+    /// operation. ORAS seeds the scope on each request but holds it in the client's scope manager,
+    /// so the client must outlive a single operation for the cached token to be found. A separate
+    /// client per repository keeps each repository's scope (and token) isolated, avoiding an
+    /// ever-growing unioned scope across repositories.
+    /// </summary>
+    /// <param name="parsedRef">The parsed reference identifying the registry and repository.</param>
+    internal Client GetOrCreateClient(Reference parsedRef)
+    {
+        string repositoryKey = $"{parsedRef.Registry}/{parsedRef.Repository}";
+        return _clients.GetOrAdd(repositoryKey, _ =>
+            new Client(
+                _httpClientFactory.CreateClient(nameof(OrasDotNetService)),
+                _credentialProvider,
+                _orasCache));
     }
 }

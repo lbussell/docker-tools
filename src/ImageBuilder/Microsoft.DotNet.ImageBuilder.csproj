@@ -65,4 +65,8 @@
   <ItemGroup>
     <ProjectReference Include="..\ImageBuilder.Models\Microsoft.DotNet.ImageBuilder.Models.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Microsoft.DotNet.ImageBuilder.Tests" />
+  </ItemGroup>
 </Project>
