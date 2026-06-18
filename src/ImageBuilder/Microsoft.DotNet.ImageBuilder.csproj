@@ -25,6 +25,16 @@
     <SignAssembly>false</SignAssembly>
   </PropertyGroup>
 
+  <!-- Bake this build's container image tag (the manifest UniqueId) into assembly metadata so the
+       'update' command can emit a self-reference into docker-images.yml without being told its own
+       tag. The Dockerfiles map the IMAGEBUILDER_TAG build arg to an MSBuild property during publish. -->
+  <PropertyGroup>
+    <IMAGEBUILDER_TAG Condition="'$(IMAGEBUILDER_TAG)' == ''"></IMAGEBUILDER_TAG>
+  </PropertyGroup>
+  <ItemGroup>
+    <AssemblyMetadata Include="UniqueId" Value="$(IMAGEBUILDER_TAG)" />
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="Azure.Containers.ContainerRegistry" Version="1.3.0" />
     <PackageReference Include="Azure.Identity" Version="1.17.1" />

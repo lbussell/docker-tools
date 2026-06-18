@@ -25,7 +25,16 @@ which means `eng/docker-tools/` is not reachable from the container build.
 
 ## Keeping the copy in sync
 
-`content/` and `eng/docker-tools/` must be kept identical. Either:
+`content/` and `eng/docker-tools/` must be kept identical, with one deliberate exception:
+the ImageBuilder image tag in `content/templates/variables/docker-images.yml` is stored
+as a `{{IMAGE_BUILDER_TAG}}` Cottle template expression. A build cannot know its own future tag,
+so the embedded copy is a template; the `update` command renders only this file and substitutes
+the tag from `AssemblyMetadata("UniqueId")`. The ImageBuilder manifest passes `UniqueId` as
+a Docker manifest variable into the `IMAGEBUILDER_TAG` build arg, and the Dockerfiles expose it
+as an MSBuild property during `dotnet publish`; the ImageBuilder project emits that value as
+assembly metadata. A local build
+or the dotnet tool has no baked-in tag and falls back to `latest` with a warning. The rendered
+`eng/docker-tools/docker-images.yml` therefore holds a concrete tag on that one line. Either:
 
 - Edit both locations together, or
 - Edit `content/` and regenerate `eng/docker-tools/` by running the `update` command from the

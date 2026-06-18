@@ -6,9 +6,12 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
+using System.Text;
 using System.Threading.Tasks;
+using Cottle;
 using Microsoft.DotNet.DockerTools.Infrastructure;
-using Microsoft.Extensions.Logging;
+using Microsoft.DotNet.ImageBuilder.Templating;
 
 namespace Microsoft.DotNet.ImageBuilder.Commands;
 
@@ -25,9 +28,13 @@ namespace Microsoft.DotNet.ImageBuilder.Commands;
 /// </remarks>
 public class UpdateCommand : Command<UpdateOptions>
 {
-    private const string OutputDirectoryName = "docker-tools";
-    private const string EngDirectoryName = "eng";
+    private static readonly string s_outputRelativePath = Path.Combine("eng", "docker-tools");
+    private static readonly string s_dockerImagesRelativePath = Path.Combine("templates", "variables", "docker-images.yml");
     private const string GitDirectoryName = ".git";
+    private const string ImageBuilderTagTemplateVariableName = "IMAGE_BUILDER_TAG";
+    private const string UniqueIdMetadataKey = "UniqueId";
+
+    private static readonly DocumentConfiguration s_templateConfiguration = CottleDocumentConfiguration.Create();
 
     private readonly IFileSystem _fileSystem;
     private readonly ILogger<UpdateCommand> _logger;
@@ -43,24 +50,6 @@ public class UpdateCommand : Command<UpdateOptions>
     public override Task ExecuteAsync()
     {
         string currentDirectory = _fileSystem.GetCurrentDirectory();
-        EnsureGitRepositoryRoot(currentDirectory);
-
-        string outputPath = Path.Combine(currentDirectory, EngDirectoryName, OutputDirectoryName);
-        EnsureOutputDirectory(outputPath);
-
-        IReadOnlyDictionary<string, byte[]> filesToWrite = GetEmbeddedFilesByDestination(outputPath);
-
-        DeleteStaleFiles(outputPath, filesToWrite.Keys);
-        WriteFiles(filesToWrite);
-        PruneEmptyDirectories(outputPath);
-
-        return Task.CompletedTask;
-    }
-
-    private void EnsureGitRepositoryRoot(string currentDirectory)
-    {
-        // A git working tree root is the directory that contains a '.git' entry. It is a directory
-        // for a normal clone, or a file for worktrees and submodules, so accept either.
         string gitPath = Path.Combine(currentDirectory, GitDirectoryName);
         if (!_fileSystem.DirectoryExists(gitPath) && !_fileSystem.FileExists(gitPath))
         {
@@ -68,64 +57,77 @@ public class UpdateCommand : Command<UpdateOptions>
                 $"The 'update' command must be run from the root of a git repository. " +
                 $"No '{GitDirectoryName}' entry was found in '{currentDirectory}'.");
         }
-    }
 
-    private void EnsureOutputDirectory(string outputPath)
-    {
-        if (_fileSystem.DirectoryExists(outputPath))
-        {
-            return;
-        }
-
-        if (!Options.Init)
+        string outputPath = Path.Combine(currentDirectory, s_outputRelativePath);
+        if (!Options.Init && !_fileSystem.DirectoryExists(outputPath))
         {
             throw new InvalidOperationException(
                 $"The output directory '{outputPath}' does not exist. " +
                 $"Pass --init to create it (use this only when onboarding a repo to docker-tools).");
         }
 
-        if (Options.IsDryRun)
+        if (Options.Init)
         {
-            _logger.LogInformation("[Dry run] Would create directory '{OutputPath}'", outputPath);
-            return;
-        }
-
-        _fileSystem.CreateDirectory(outputPath);
-        _logger.LogInformation("Created directory '{OutputPath}'", outputPath);
-    }
-
-    private static IReadOnlyDictionary<string, byte[]> GetEmbeddedFilesByDestination(string outputPath) =>
-        InfrastructureContent.GetRelativePaths()
-            .ToDictionary(
-                relativePath => Path.Combine(outputPath, NormalizeSeparators(relativePath)),
-                InfrastructureContent.ReadAllBytes);
-
-    private void DeleteStaleFiles(string outputPath, IEnumerable<string> filesToWrite)
-    {
-        if (!_fileSystem.DirectoryExists(outputPath))
-        {
-            return;
-        }
-
-        HashSet<string> destinationFiles = new(filesToWrite, StringComparer.Ordinal);
-        IEnumerable<string> staleFiles = _fileSystem.EnumerateFiles(outputPath)
-            .Where(existingFile => !destinationFiles.Contains(existingFile));
-
-        foreach (string staleFile in staleFiles)
-        {
-            if (Options.IsDryRun)
+            if (!Options.IsDryRun)
             {
-                _logger.LogInformation("[Dry run] Would delete stale file '{StaleFile}'", staleFile);
-                continue;
+                _fileSystem.CreateDirectory(outputPath);
             }
-
-            _fileSystem.DeleteFile(staleFile);
-            _logger.LogInformation("Deleted stale file '{StaleFile}'", staleFile);
         }
-    }
 
-    private void WriteFiles(IReadOnlyDictionary<string, byte[]> filesToWrite)
-    {
+        string imageBuilderTag;
+        if (GetImageBuilderTag() is { } resolvedImageBuilderTag && !string.IsNullOrWhiteSpace(resolvedImageBuilderTag))
+        {
+            imageBuilderTag = resolvedImageBuilderTag;
+        }
+        else
+        {
+            _logger.LogWarning(
+                "This build of ImageBuilder was not built with the \"IMAGEBUILDER_TAG\" MSBuild property set. " +
+                "ImageBuilder tag will fall back to \"latest\".");
+            imageBuilderTag = "latest";
+        }
+
+        IReadOnlyList<string> embeddedRelativePaths = InfrastructureContent.GetRelativePaths();
+        IReadOnlyDictionary<string, byte[]> filesToWrite = embeddedRelativePaths
+            .ToDictionary(
+                relativePath => Path.Combine(outputPath, relativePath.Replace('/', Path.DirectorySeparatorChar)),
+                relativePath =>
+                {
+                    byte[] content = InfrastructureContent.ReadAllBytes(relativePath);
+                    if (relativePath.Replace('/', Path.DirectorySeparatorChar) != s_dockerImagesRelativePath)
+                    {
+                        return content;
+                    }
+
+                    string template = Encoding.UTF8.GetString(content);
+                    IDocument document = Document.CreateDefault(template, s_templateConfiguration).DocumentOrThrow;
+                    Dictionary<Value, Value> symbols = new()
+                    {
+                        [ImageBuilderTagTemplateVariableName] = imageBuilderTag
+                    };
+
+                    return Encoding.UTF8.GetBytes(document.Render(Context.CreateBuiltin(symbols)));
+                });
+
+        if (_fileSystem.DirectoryExists(outputPath))
+        {
+            HashSet<string> destinationFiles = new(filesToWrite.Keys, StringComparer.Ordinal);
+            IEnumerable<string> staleFiles = _fileSystem.EnumerateFiles(outputPath)
+                .Where(existingFile => !destinationFiles.Contains(existingFile));
+
+            foreach (string staleFile in staleFiles)
+            {
+                if (Options.IsDryRun)
+                {
+                    _logger.LogInformation("[Dry run] Would delete stale file '{StaleFile}'", staleFile);
+                    continue;
+                }
+
+                _fileSystem.DeleteFile(staleFile);
+                _logger.LogInformation("Deleted stale file '{StaleFile}'", staleFile);
+            }
+        }
+
         foreach ((string destinationPath, byte[] contents) in filesToWrite)
         {
             if (Options.IsDryRun)
@@ -143,31 +145,30 @@ public class UpdateCommand : Command<UpdateOptions>
             _fileSystem.WriteAllBytes(destinationPath, contents);
             _logger.LogInformation("Wrote '{DestinationPath}'", destinationPath);
         }
-    }
 
-    private void PruneEmptyDirectories(string outputPath)
-    {
-        if (Options.IsDryRun || !_fileSystem.DirectoryExists(outputPath))
+        if (!Options.IsDryRun && _fileSystem.DirectoryExists(outputPath))
         {
-            return;
-        }
+            // Delete deepest directories first so that parents that become empty are pruned in turn.
+            IEnumerable<string> directories = _fileSystem.EnumerateDirectories(outputPath)
+                .OrderByDescending(directory => directory.Length);
 
-        // Delete deepest directories first so that parents that become empty are pruned in turn.
-        IEnumerable<string> directories = _fileSystem.EnumerateDirectories(outputPath)
-            .OrderByDescending(directory => directory.Length);
-
-        foreach (string directory in directories)
-        {
-            if (_fileSystem.EnumerateFiles(directory).Any() || _fileSystem.EnumerateDirectories(directory).Any())
+            foreach (string directory in directories)
             {
-                continue;
-            }
+                if (_fileSystem.EnumerateFiles(directory).Any() || _fileSystem.EnumerateDirectories(directory).Any())
+                {
+                    continue;
+                }
 
-            _fileSystem.DeleteDirectory(directory);
-            _logger.LogInformation("Pruned empty directory '{Directory}'", directory);
+                _fileSystem.DeleteDirectory(directory);
+                _logger.LogInformation("Pruned empty directory '{Directory}'", directory);
+            }
         }
+
+        return Task.CompletedTask;
     }
 
-    private static string NormalizeSeparators(string relativePath) =>
-        relativePath.Replace('/', Path.DirectorySeparatorChar);
+    protected virtual string? GetImageBuilderTag() =>
+        typeof(UpdateCommand).Assembly
+            .GetCustomAttributes<AssemblyMetadataAttribute>()
+            .FirstOrDefault(attribute => attribute.Key == UniqueIdMetadataKey)?.Value;
 }

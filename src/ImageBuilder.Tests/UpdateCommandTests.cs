@@ -5,6 +5,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Text;
 using System.Threading.Tasks;
 using Microsoft.DotNet.DockerTools.Infrastructure;
 using Microsoft.DotNet.ImageBuilder.Commands;
@@ -33,13 +34,61 @@ public class UpdateCommandTests
 
         IReadOnlyList<string> expectedPaths = InfrastructureContent.GetRelativePaths();
         expectedPaths.ShouldNotBeEmpty();
+        List<string> renderedDestinations = [];
 
         foreach (string relativePath in expectedPaths)
         {
             string expectedDestination = Path.Combine(OutputPath, relativePath.Replace('/', Path.DirectorySeparatorChar));
             fileSystem.FileExists(expectedDestination).ShouldBeTrue();
-            fileSystem.GetFileBytes(expectedDestination).ShouldBe(InfrastructureContent.ReadAllBytes(relativePath));
+
+            if (fileSystem.GetFileBytes(expectedDestination).SequenceEqual(InfrastructureContent.ReadAllBytes(relativePath)))
+            {
+                continue;
+            }
+
+            renderedDestinations.Add(expectedDestination);
         }
+
+        renderedDestinations.Count.ShouldBe(1);
+    }
+
+    [TestMethod]
+    public async Task UpdateCommand_UniqueIdAssemblyMetadataSet_RendersDockerImagesTemplate()
+    {
+        const string tag = "1234567";
+        InMemoryFileSystem fileSystem = CreateRepoFileSystem();
+        fileSystem.AddDirectory(OutputPath);
+        UpdateCommand command = CreateCommand(fileSystem, tag);
+
+        await command.ExecuteAsync();
+
+        string content = GetRenderedImageBuilderVariables(fileSystem, $"image-builder:{tag}");
+        content.ShouldContain($"image-builder:{tag}");
+        content.ShouldNotContain("{{");
+    }
+
+    [TestMethod]
+    public async Task UpdateCommand_UniqueIdAssemblyMetadataMissing_FallsBackToLatestWithWarning()
+    {
+        InMemoryFileSystem fileSystem = CreateRepoFileSystem();
+        fileSystem.AddDirectory(OutputPath);
+        Mock<ILogger<UpdateCommand>> logger = new();
+        UpdateCommand command = CreateCommand(fileSystem, tag: null, logger: logger);
+
+        await command.ExecuteAsync();
+
+        string content = GetRenderedImageBuilderVariables(fileSystem, "image-builder:latest");
+        content.ShouldContain("image-builder:latest");
+        content.ShouldNotContain("{{");
+
+        logger.Verify(
+            log => log.Log(
+                LogLevel.Warning,
+                It.IsAny<EventId>(),
+                It.IsAny<It.IsAnyType>(),
+                It.IsAny<Exception?>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Once);
     }
 
     [TestMethod]
@@ -134,6 +183,24 @@ public class UpdateCommandTests
         return fileSystem;
     }
 
-    private static UpdateCommand CreateCommand(IFileSystem fileSystem) =>
-        new(fileSystem, Mock.Of<ILogger<UpdateCommand>>());
+    private static UpdateCommand CreateCommand(
+        IFileSystem fileSystem,
+        string? tag = null,
+        Mock<ILogger<UpdateCommand>>? logger = null)
+    {
+        return new TestUpdateCommand(fileSystem, (logger ?? new Mock<ILogger<UpdateCommand>>()).Object, tag);
+    }
+
+    private static string GetRenderedImageBuilderVariables(InMemoryFileSystem fileSystem, string expectedImageBuilderReference) =>
+        fileSystem.FilesWritten
+            .Select(path => Encoding.UTF8.GetString(fileSystem.GetFileBytes(path)))
+            .Single(content => content.Contains(expectedImageBuilderReference));
+
+    private sealed class TestUpdateCommand(
+        IFileSystem fileSystem,
+        ILogger<UpdateCommand> logger,
+        string? imageBuilderTag) : UpdateCommand(fileSystem, logger)
+    {
+        protected override string? GetImageBuilderTag() => imageBuilderTag;
+    }
 }
