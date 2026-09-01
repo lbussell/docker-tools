@@ -18,7 +18,7 @@
   <PropertyGroup Label="Packaging Settings">
     <IsPackable>true</IsPackable>
     <MajorVersion>0</MajorVersion>
-    <MinorVersion>2</MinorVersion>
+    <MinorVersion>3</MinorVersion>
     <PatchVersion>0</PatchVersion>
     <Description>Declarative git automation library.</Description>
     <PackageReadmeFile>README.md</PackageReadmeFile>
@@ -32,6 +32,10 @@
     <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.10" />
     <PackageReference Include="Octokit" Version="14.0.0" />
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.22.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../GitAutomation.AzureDevOps/Microsoft.DotNet.GitAutomation.AzureDevOps.csproj" />
   </ItemGroup>
 
   <ItemGroup>
